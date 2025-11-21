@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    container_name: sqlserver-cdc
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=YourPassword123!
+      - MSSQL_PID=Developer
+      - MSSQL_TCP_PORT=1433
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver-data:/var/opt/mssql
+      - ./sqlserver/init:/docker-entrypoint-initdb.d
+    user: root 
+    networks:
+      - cdc-network
+      
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    container_name: rabbitmq-cdc
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    networks:
+      - cdc-network
+
+  debezium-server:
+    image: debezium/server:2.3
+    container_name: debezium-server
+    environment:
+      - QUARKUS_LOG_LEVEL=INFO
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./debezium/conf:/debezium/conf
+    depends_on:
+      - sqlserver
+      - rabbitmq
+    networks:
+      - cdc-network
+
+volumes:
+  sqlserver-data:
+  rabbitmq-data:
+
+networks:
+  cdc-network:
+    driver: bridge

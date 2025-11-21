@@ -1,0 +1,107 @@
+{
+  "users": [
+    {
+      "name": "guest",
+      "password": "guest",
+      "tags": "administrator"
+    }
+  ],
+  "vhosts": [
+    {
+      "name": "/"
+    }
+  ],
+  "permissions": [
+    {
+      "user": "guest",
+      "vhost": "/",
+      "configure": ".*",
+      "write": ".*",
+      "read": ".*"
+    }
+  ],
+  "exchanges": [
+    {
+      "name": "debezium.cdc.events",
+      "type": "direct",
+      "durable": true,
+      "auto_delete": false
+    },
+    {
+      "name": "applicant.fanout",
+      "type": "fanout",
+      "durable": true,
+      "auto_delete": false
+    }
+  ],
+  "queues": [
+    {
+      "name": "publishedpackagequeue",
+      "durable": true,
+      "auto_delete": false
+    },
+    {
+      "name": "canceledpackagequeue",
+      "durable": true,
+      "auto_delete": false
+    },
+    {
+      "name": "applicant.queue1",
+      "durable": true,
+      "auto_delete": false
+    },
+    {
+      "name": "applicant.queue2",
+      "durable": true,
+      "auto_delete": false
+    },
+    {
+      "name": "booking.events",
+      "durable": true,
+      "auto_delete": false
+    },
+    {
+      "name": "default.cdc.events",
+      "durable": true,
+      "auto_delete": false
+    }
+  ],
+  "bindings": [
+    {
+      "source": "applicant.fanout",
+      "destination": "applicant.queue1",
+      "destination_type": "queue",
+      "routing_key": ""
+    },
+    {
+      "source": "applicant.fanout",
+      "destination": "applicant.queue2",
+      "destination_type": "queue",
+      "routing_key": ""
+    },
+    {
+      "source": "debezium.cdc.events",
+      "destination": "publishedpackagequeue",
+      "destination_type": "queue",
+      "routing_key": "publishedpackagequeue"
+    },
+    {
+      "source": "debezium.cdc.events",
+      "destination": "canceledpackagequeue",
+      "destination_type": "queue",
+      "routing_key": "canceledpackagequeue"
+    },
+    {
+      "source": "debezium.cdc.events",
+      "destination": "booking.events",
+      "destination_type": "queue",
+      "routing_key": "booking.events"
+    },
+    {
+      "source": "debezium.cdc.events",
+      "destination": "default.cdc.events",
+      "destination_type": "queue",
+      "routing_key": "default.cdc.events"
+    }
+  ]
+}
