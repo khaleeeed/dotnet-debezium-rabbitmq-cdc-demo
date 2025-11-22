@@ -1,0 +1,57 @@
+# Ignore .dat files in top-level data directory and Debezium data
+/data/*.dat
+/debezium/data/*.dat
+
+# Visual Studio
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Build results
+**/bin/
+**/obj/
+
+# Rider
+.idea/
+
+# VS Code
+.vscode/
+
+# NuGet
+*.nupkg
+packages/
+
+# Azure Pipelines
+azure-pipelines.yml
+
+# Docker
+**/Dockerfile*
+**/docker-compose*
+
+# Logs
+*.log
+
+# OS files
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Secrets and local env
+.env
+secrets.json
+
+# Git attributes
+.gitattributes
+
+# Ignore publish output
+**/publish/
+
+# JetBrains Rider
+*.sln.iml
+
+# Others
+*.class
+*.war
+*.ear
