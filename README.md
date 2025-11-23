@@ -66,7 +66,6 @@ When these statements run Debezium should capture the change and publish events 
     - `sqlserver-cdc.BookingSystem.dbo.booking` -> handled by `BookingConsumer`
     - `sqlserver-cdc.BookingSystem.dbo.package` -> handled by `PackageConsumer`
 
-The code configures `ConfigureConsumeTopology = false` and manually binds each queue to the `cdc.events` exchange with exchange type `topic`. The consumer expects raw JSON payloads and uses case-insensitive JSON mapping.
 
 **Debezium configuration highlights**
 - `debezium/conf/application.properties` points Debezium at `sqlserver` on the Docker network and instructs Debezium to publish to RabbitMQ at `rabbitmq:5672`.
@@ -74,39 +73,6 @@ The code configures `ConfigureConsumeTopology = false` and manually binds each q
     - `debezium.source.table.include.list=dbo.booking,dbo.package,dbo.applicant`
     - `debezium.sink.rabbitmq.exchange=cdc.events`
     - `debezium.sink.rabbitmq.routingKey.source=topic` (routing key derived from topic name)
-
-If you change the Debezium exchange name, ensure the consumer bindings use the same exchange name.
-
-**Troubleshooting tips**
-- If you see no messages in the consumer logs:
-    - Verify Debezium logs (container `debezium-server`) for connector start and errors (`docker logs -f debezium-server`).
-    - Verify that CDC is enabled in SQL Server (`sys.databases` and `sys.tables` queries are included in `sqlserver/init/01-init-database.sql`).
-    - Confirm RabbitMQ exchange name and bindings via management UI (`http://localhost:15672`).
-    - Ensure the consumer's `RABBITMQ_HOST` env var points to `rabbitmq` while running inside Docker network or to `localhost` when running locally and forwarding ports.
-
-**Suggested next steps / improvements**
-- Add a small producer app that modifies the database via a minimal API to drive events easily.
-- Containerize the consumer and add it to `docker-compose.yml` to run everything together.
-- Add logs or metrics exporter (Prometheus) for better observability.
-- Add tests that assert messages arrive after database changes (integration tests using Testcontainers).
-
-**Files of interest**
-- `docker-compose.yml` — starts SQL Server, RabbitMQ, Debezium
-- `debezium/conf/application.properties` — Debezium Server config
-- `sqlserver/init/01-init-database.sql` — DB creation, CDC enable, sample data
-- `consumers/` — .NET MassTransit consumer application
-- `rabbitmq/definitions.json` — example exchanges/queues/bindings
-
-If you'd like, I can:
-- Add a Dockerfile and service entry for the consumer so everything runs with `docker-compose up -d`.
-- Create a small producer or Postman collection to exercise CDC easily.
-
----
----
-
-## Short Overview
-
-Minimal demo: SQL Server (CDC) -> Debezium Server -> RabbitMQ -> .NET MassTransit consumers
 
 ASCII diagram:
 
