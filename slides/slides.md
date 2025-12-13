@@ -242,6 +242,47 @@ Here's where Debezium transforms our architecture. Database changes automaticall
 layout: default
 ---
 
+# Outbox Pattern
+
+**Reliable Event Publishing with Transactional Consistency**
+
+<div class="grid grid-cols-2 gap-6 mt-4">
+<div>
+
+### The Problem
+- Publishing events and saving data are separate operations
+- Risk of data saved but event not published (or vice versa)
+
+### The Solution
+- Debezium captures outbox entries
+- Events published reliably
+
+### Guarantees
+- **Atomicity** - Event and data saved together
+- **At-least-once delivery**
+- **No message loss**
+
+</div>
+<div>
+
+<img src="/outbox-pattern-diagram.png" class="w-full h-auto rounded-lg shadow-lg border border-slate-200" alt="Outbox Pattern" />
+
+<div class="text-xs mt-2 opacity-75">
+Outbox table ensures event publishing is part of the transaction
+</div>
+
+</div>
+</div>
+
+<!--
+The Outbox Pattern solves a critical problem: how do you reliably publish events when saving data? If you save to the database and then publish to Kafka, what happens if Kafka is down? You lose the event. If you publish first then save, what if the database save fails? With the Outbox Pattern, you write both your business data and an event record to an outbox table in the same transaction. Debezium monitors the outbox table and publishes events to Kafka. This guarantees that every committed transaction results in a published event.
+-->
+
+
+---
+layout: default
+---
+
 # CQRS Pattern
 
 **Command Query Responsibility Segregation**
@@ -280,46 +321,6 @@ Write model → Debezium → Optimized read models
 CQRS separates write operations from read operations, allowing each to be optimized independently. Your write model can be highly normalized for data integrity, while your read model is denormalized for performance. Debezium bridges the gap: writes go to the normalized database, Debezium captures those changes, and a projection service updates the denormalized read database. This avoids the dual-write problem where you'd have to update both databases in your application code.
 -->
 
-
----
-layout: default
----
-
-# Outbox Pattern
-
-**Reliable Event Publishing with Transactional Consistency**
-
-<div class="grid grid-cols-2 gap-6 mt-4">
-<div>
-
-### The Problem
-- Publishing events and saving data are separate operations
-- Risk of data saved but event not published (or vice versa)
-
-### The Solution
-- Debezium captures outbox entries
-- Events published reliably
-
-### Guarantees
-- **Atomicity** - Event and data saved together
-- **At-least-once delivery**
-- **No message loss**
-
-</div>
-<div>
-
-<img src="/outbox-pattern-diagram.png" class="w-full h-auto rounded-lg shadow-lg border border-slate-200" alt="Outbox Pattern" />
-
-<div class="text-xs mt-2 opacity-75">
-Outbox table ensures event publishing is part of the transaction
-</div>
-
-</div>
-</div>
-
-<!--
-The Outbox Pattern solves a critical problem: how do you reliably publish events when saving data? If you save to the database and then publish to Kafka, what happens if Kafka is down? You lose the event. If you publish first then save, what if the database save fails? With the Outbox Pattern, you write both your business data and an event record to an outbox table in the same transaction. Debezium monitors the outbox table and publishes events to Kafka. This guarantees that every committed transaction results in a published event.
--->
 
 ---
 layout: default
