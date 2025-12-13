@@ -69,11 +69,6 @@ strong {
   font-weight: 700;
 }
 
-/* Smooth transitions for diagrams if possible, or just text */
-.slidev-vclick-target {
-  transition: all 0.3s ease;
-}
-
 /* Hide default Slidev UI elements (Navigation, Controls) to remove "black pointer" artifacts */
 .slidev-controls,
 .slidev-nav,
@@ -118,44 +113,25 @@ layout: two-cols
 Events that represent significant business occurrences within a bounded context
 
 ### Key Benefits
-<v-clicks>
 
 - **Decoupling** - Services don't need direct dependencies
 - **Scalability** - Independent service scaling
 - **Real-time Reactions** - Immediate downstream processing
 - **Audit Trail** - Complete history of business events
 
-</v-clicks>
 
 ::right::
 
-<v-click>
 <div class="mt-12 ml-4 flex flex-col items-center justify-center text-center">
 
-### Example: OrderPlaced Event
 
-```mermaid {scale: 0.5}
-graph TD
-    A[Order Service] -->|OrderPlaced| B[Event Bus]
-    B --> C[Inventory Service]
-    B --> D[Payment Service]
-    B --> E[Notification Service]
-    B --> F[Analytics Service]
-
-    style A fill:#1A468B
-    style B fill:#F5A623
-    style C fill:#7ED321
-    style D fill:#7ED321
-    style E fill:#7ED321
-    style F fill:#7ED321
-```
+<img src="/domain-events-diagram.png" class="w-full h-auto rounded-lg shadow-lg border border-slate-200" alt="Domain Events Example" />
 
 <div class="text-xs mt-4 opacity-75">
 Single event triggers multiple independent reactions
 </div>
 
 </div>
-</v-click>
 
 <!--
 Domain Events are business-significant occurrences that happen within your system. When an order is placed, that's not just a database update—it's a business event that triggers multiple reactions. The Inventory Service needs to reserve items, Payment Service processes payment, Notification Service sends confirmations, and Analytics tracks the sale. All these services react independently without tight coupling.
@@ -171,7 +147,6 @@ layout: default
 <div>
 
 ### Technical Challenges
-<v-clicks>
 
 - **Event Ordering** - Maintaining sequence across services
 - **Reliable Delivery** - Guaranteeing at-least-once delivery
@@ -180,18 +155,15 @@ layout: default
 - **Failure handling** - Failure handling & retries
 
 
-</v-clicks>
 </div>
 <div>
 
-<v-clicks>
 
 <div class="mt-8">
 
 <img src="/challenges-diagram.png" class="w-full h-auto rounded-lg shadow-lg border border-slate-200" alt="Challenges Diagram" />
 
 </div>
-</v-clicks>
 
 </div>
 </div>
@@ -215,14 +187,12 @@ layout: default
 Technique for tracking and capturing database changes in real-time
 
 ### Debezium Features
-<v-clicks>
 
 - **Database Support** - MySQL, PostgreSQL, MongoDB, etc.
 - **Message Broker Support** - Kafka,Rabbitmq, Amazon Kinesis, etc.
 - **Low Latency** - real-time capture
 - **No Code Changes** - Non-intrusive
 
-</v-clicks>
 
 </div>
 <div class="mt-4">
@@ -286,34 +256,18 @@ layout: default
 - **Scalability** - Scale reads and writes independently
 
 ### Benefits with Debezium
-<v-clicks>
+
 
 - Automatic synchronization
 - No dual-write problem
 - Eventual consistency guaranteed
 
-</v-clicks>
+
 
 </div>
 <div>
 
-```mermaid {scale: 0.7}
-graph TD
-    A[Command API<br/>POST /orders] --> B[(Write DB<br/>Normalized)]
-    B -->|CDC| C[Debezium]
-    C -->|Events| D[Kafka]
-    D --> E[Projection Service]
-    E --> F[(Read DB<br/>Denormalized)]
-    G[Query API<br/>GET /orders] --> F
-
-    style B fill:#1A468B
-    style C fill:#F5A623
-    style D fill:#F5A623
-    style E fill:#BD10E0
-    style F fill:#1A468B
-    style A fill:#7ED321
-    style G fill:#7ED321
-```
+<img src="/cqrs-diagram.png" class="w-full h-auto rounded-lg shadow-lg border border-slate-200" alt="CQRS Pattern" />
 
 <div class="text-xs mt-2 opacity-75">
 Write model → Debezium → Optimized read models
@@ -325,6 +279,7 @@ Write model → Debezium → Optimized read models
 <!--
 CQRS separates write operations from read operations, allowing each to be optimized independently. Your write model can be highly normalized for data integrity, while your read model is denormalized for performance. Debezium bridges the gap: writes go to the normalized database, Debezium captures those changes, and a projection service updates the denormalized read database. This avoids the dual-write problem where you'd have to update both databases in your application code.
 -->
+
 
 ---
 layout: default
@@ -342,7 +297,6 @@ layout: default
 - Risk of data saved but event not published (or vice versa)
 
 ### The Solution
-- Store events in an **Outbox Table** within same transaction
 - Debezium captures outbox entries
 - Events published reliably
 
@@ -354,27 +308,7 @@ layout: default
 </div>
 <div>
 
-```mermaid {scale: 0.65}
-graph TD
-    A[Create Order API] --> B{Transaction}
-    B --> C[(Orders Table)]
-    B --> D[(Outbox Table)]
-    B --> E[COMMIT]
-    D -->|CDC| F[Debezium]
-    F --> G[Kafka Topic]
-    G --> H[Payment Service]
-    G --> I[Inventory Service]
-    G --> J[Notification Service]
-
-    style B fill:#BD10E0
-    style C fill:#1A468B
-    style D fill:#1A468B
-    style F fill:#F5A623
-    style G fill:#F5A623
-    style H fill:#7ED321
-    style I fill:#7ED321
-    style J fill:#7ED321
-```
+<img src="/outbox-pattern-diagram.png" class="w-full h-auto rounded-lg shadow-lg border border-slate-200" alt="Outbox Pattern" />
 
 <div class="text-xs mt-2 opacity-75">
 Outbox table ensures event publishing is part of the transaction
@@ -399,7 +333,7 @@ layout: default
 <div>
 
 ### Distributed Transaction Challenge
-- No global ACID transactions across services
+- No global transactions across services
 - Need coordinated multi-step workflows
 
 ### Saga Solution
@@ -415,31 +349,7 @@ layout: default
 </div>
 <div>
 
-```mermaid {scale: 0.6}
-graph TD
-    A[Order Created] -->|Success| B[Reserve Inventory]
-    B -->|Success| C[Process Payment]
-    C -->|Success| D[Ship Order]
-    D --> E[Order Complete ✓]
-
-    C -->|Failure| F[Release Inventory]
-    F --> G[Cancel Order]
-    B -->|Failure| H[Cancel Order]
-
-    A -.->|via Debezium| B
-    B -.->|via Debezium| C
-    C -.->|via Debezium| D
-    C -.->|via Debezium| F
-
-    style A fill:#1A468B
-    style B fill:#7ED321
-    style C fill:#7ED321
-    style D fill:#7ED321
-    style E fill:#7ED321
-    style F fill:#D0021B
-    style G fill:#D0021B
-    style H fill:#D0021B
-```
+<img src="/saga-diagram.png" class="w-full h-auto rounded-lg shadow-lg border border-slate-200" alt="Saga Pattern" />
 
 <div class="text-xs mt-2 opacity-75">
 Multi-step workflow with compensating actions
@@ -453,71 +363,6 @@ The Saga Pattern manages distributed transactions across multiple services. Inst
 -->
 
 ---
-layout: default
----
-
-# Event Sourcing
-
-**Storing State as a Sequence of Events**
-
-<div class="grid grid-cols-2 gap-6 mt-4">
-<div>
-
-### Core Concept
-- Store **every state change** as an immutable event
-- Current state = replay all events
-- Events are the source of truth
-
-### Benefits
-- **Complete Audit Trail** - Every change recorded
-- **Time Travel** - Rebuild state at any point
-- **Debugging** - Replay events to reproduce issues
-- **Analytics** - Rich historical data
-
-### With Debezium
-- Database becomes event store
-- CDC provides event stream
-- Services consume and rebuild state
-
-</div>
-<div>
-
-```mermaid {scale: 0.7}
-graph TD
-    A[Event Stream] --> B[(Event Store)]
-    B --> C[Event 1:<br/>OrderCreated]
-    B --> D[Event 2:<br/>PaymentProcessed]
-    B --> E[Event 3:<br/>ItemShipped]
-    B --> F[Event 4:<br/>OrderDelivered]
-
-    C --> G[Replay Events]
-    D --> G
-    E --> G
-    F --> G
-
-    G --> H[(Current State<br/>Materialized View)]
-
-    style A fill:#F5A623
-    style B fill:#1A468B
-    style C fill:#BD10E0
-    style D fill:#BD10E0
-    style E fill:#BD10E0
-    style F fill:#BD10E0
-    style H fill:#7ED321
-```
-
-<div class="text-xs mt-2 opacity-75">
-Replay events to rebuild current state at any point in time
-</div>
-
-</div>
-</div>
-
-<!--
-Event Sourcing takes event-driven architecture to its logical conclusion: instead of storing current state, store every event that led to that state. Your order isn't just a row with status "delivered"—it's a sequence of events: OrderCreated, PaymentProcessed, ItemShipped, OrderDelivered. This gives you a complete audit trail, the ability to time travel and see state at any point, and rich data for analytics. Debezium can treat your database as an event store, capturing every change as an immutable event.
--->
-
----
 layout: center
 class: text-center
 ---
@@ -526,13 +371,11 @@ class: text-center
 
 <div class="mt-12">
 
-### Contact & Resources
+### Resources
 
-📧 presenter@company.com
+🔗 [github.com/debezium/debezium](https://github.com/khaleeeed/dotnet-debezium-rabbitmq-cdc-demo)
 
-🔗 github.com/debezium/debezium
-
-📚 debezium.io/documentation
+📚 [debezium.io/documentation](https://debezium.io/documentation)
 
 </div>
 
