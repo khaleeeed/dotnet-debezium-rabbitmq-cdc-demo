@@ -1,0 +1,326 @@
+﻿@page
+@model CdcDashboard.Pages.ApplicantsModel
+@{
+	ViewData["Title"] = "Applicants";
+	ViewData["Subtitle"] = "Real-time  CDC feed";
+}
+
+<div x-data="applicantsApp()">
+	<!-- top summary + analytics row -->
+	<section class="mb-6 grid grid-cols-12 gap-6">
+		<!-- Summary Cards -->
+		<div class="col-span-8 bg-white rounded-2xl p-6 shadow">
+			<div class="grid grid-cols-4 gap-6">
+				<div class="text-center p-4 bg-slate-50 rounded-xl">
+					<div class="text-xs text-slate-400 mb-1">Total Events</div>
+					<div class="text-4xl font-bold text-slate-800" x-text="counts.total"></div>
+				</div>
+				<div class="text-center p-4 bg-emerald-50 rounded-xl border-2 border-emerald-200">
+					<div class="text-xs text-emerald-600 mb-1">Creates</div>
+					<div class="text-4xl font-bold text-emerald-600" x-text="counts.create"></div>
+				</div>
+				<div class="text-center p-4 bg-amber-50 rounded-xl border-2 border-amber-200">
+					<div class="text-xs text-amber-600 mb-1">Updates</div>
+					<div class="text-4xl font-bold text-amber-600" x-text="counts.update"></div>
+				</div>
+				<div class="text-center p-4 bg-rose-50 rounded-xl border-2 border-rose-200">
+					<div class="text-xs text-rose-600 mb-1">Deletes</div>
+					<div class="text-4xl font-bold text-rose-600" x-text="counts.delete"></div>
+				</div>
+			</div>
+		</div>
+
+		<!-- Top changed fields -->
+		<aside class="col-span-4 bg-white rounded-2xl p-6 shadow">
+			<h3 class="text-sm font-semibold mb-4">Top Changed Fields</h3>
+			<ul class="text-sm text-slate-600 space-y-3">
+				<template x-for="f in topFields" :key="f.name">
+					<li class="flex justify-between items-center">
+						<div><b x-text="f.name"></b> <span class="text-xs text-slate-400" x-text="'(' + f.count + ')'"></span></div>
+						<div class="w-28 h-2 bg-slate-100 rounded-full overflow-hidden">
+							<div class="h-2 bg-amber-400" :style="'width:' + Math.min(100, (f.count/topMax*100)) + '%'"></div>
+						</div>
+					</li>
+				</template>
+				<template x-if="topFields.length === 0">
+					<li class="text-xs text-slate-400">No field changes yet</li>
+				</template>
+			</ul>
+		</aside>
+	</section>
+
+	<section class="grid grid-cols-12 gap-6">
+		<!-- timeline -->
+		<aside class="col-span-5 bg-white rounded-2xl p-4 shadow max-h-[65vh] overflow-y-auto">
+			<div class="flex items-center justify-between mb-3">
+				<h2 class="text-sm font-semibold">Event Timeline</h2>
+				<div class="text-xs text-slate-400">Live</div>
+			</div>
+
+			<template x-for="ev in events" :key="ev.uid">
+				<div x-on:click="select(ev)"
+					 :class="['group p-3 mb-3 rounded-xl transition-shadow cursor-pointer flex justify-between items-start', ev.type==='Create' ? 'border-l-4 border-emerald-500 bg-emerald-50' : (ev.type==='Update' ? 'border-l-4 border-amber-400 bg-amber-50' : 'border-l-4 border-rose-500 bg-rose-50 opacity-80 line-through'), ev.isNew ? 'pulse-new' : '']">
+					<div class="w-3/4">
+						<div class="flex items-center gap-2">
+							<div class="text-sm font-medium" x-text="ev.name || ('Applicant #' + ev.id)"></div>
+							<div class="text-xs text-slate-500" x-text="ev.type"></div>
+						</div>
+						<div class="text-xs text-slate-400 mt-1" x-text="ev.time"></div>
+					</div>
+					<div class="text-xs text-slate-400">
+						<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 group-hover:scale-110 transition" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+							<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+						</svg>
+					</div>
+				</div>
+			</template>
+		</aside>
+
+		<!-- inspector -->
+		<section class="col-span-7 bg-white rounded-2xl p-6 shadow">
+			<div class="flex justify-between items-start">
+				<div>
+					<h2 class="text-lg font-semibold" x-text="selected ? (selected.name || ('Applicant #' + selected.id)) : 'Inspector'"></h2>
+					<p class="text-xs text-slate-400" x-text="selected ? selected.time : 'Select an event to inspect before/after values and diffs'"></p>
+				</div>
+				<div>
+					<button class="text-xs px-3 py-1 rounded-full bg-slate-100 text-slate-700" @@click="clearSelection()">Clear</button>
+				</div>
+			</div>
+
+			<div class="mt-4 grid grid-cols-2 gap-4">
+				<div>
+					<div class="text-xs text-slate-400 mb-2">Before</div>
+					<div class="bg-slate-50 p-3 rounded-lg min-h-[120px] text-sm">
+						<template x-if="beforeKeys.length > 0">
+							<div>
+								<template x-for="k in beforeKeys" :key="k">
+									<div class="mb-1">
+										<span class="text-xs text-slate-500" x-text="k + ':'"></span>
+										<span class="ml-2 diff-old" x-text="getBeforeValue(k)"></span>
+									</div>
+								</template>
+							</div>
+						</template>
+						<template x-if="beforeKeys.length === 0">
+							<div class="text-xs text-slate-400">No before data</div>
+						</template>
+					</div>
+				</div>
+				<div>
+					<div class="text-xs text-slate-400 mb-2">After</div>
+					<div class="bg-slate-50 p-3 rounded-lg min-h-[120px] text-sm">
+						<template x-if="afterKeys.length > 0">
+							<div>
+								<template x-for="k in afterKeys" :key="k">
+									<div class="mb-1">
+										<span class="text-xs text-slate-500" x-text="k + ':'"></span>
+										<span class="ml-2 diff-new" x-text="getAfterValue(k)"></span>
+									</div>
+								</template>
+							</div>
+						</template>
+						<template x-if="afterKeys.length === 0">
+							<div class="text-xs text-slate-400">No after data</div>
+						</template>
+					</div>
+				</div>
+			</div>
+
+			<div class="mt-4">
+				<h3 class="text-sm font-medium mb-2">Changed Fields</h3>
+				<div class="space-y-2">
+					<template x-if="changesKeys.length > 0">
+						<div>
+							<template x-for="k in changesKeys" :key="k">
+								<div class="p-2 rounded-lg bg-slate-50 flex justify-between items-center mb-2">
+									<div>
+										<div class="text-xs text-slate-500" x-text="k"></div>
+										<div class="text-sm">
+											<span class="diff-old" x-text="getChangeOld(k)"></span>
+											<span class="mx-2">→</span>
+											<span class="diff-new" x-text="getChangeNew(k)"></span>
+										</div>
+									</div>
+								</div>
+							</template>
+						</div>
+					</template>
+					<template x-if="changesKeys.length === 0">
+						<div class="text-xs text-slate-400">No field-level changes to display</div>
+					</template>
+				</div>
+			</div>
+		</section>
+	</section>
+</div>
+
+@section Scripts {
+	<script>
+		function applicantsApp() {
+			return {
+				events: [],
+				selected: null,
+				counts: { total: 0, create: 0, update: 0, delete: 0 },
+				topFields: [],
+				topMax: 1,
+				connection: null,
+				beforeKeys: [],
+				afterKeys: [],
+				changesKeys: [],
+
+				updateKeyArrays() {
+					if (!this.selected) {
+						this.beforeKeys = [];
+						this.afterKeys = [];
+						this.changesKeys = [];
+						return;
+					}
+					this.beforeKeys = (this.selected.before && typeof this.selected.before === 'object')
+						? Object.keys(this.selected.before) : [];
+					this.afterKeys = (this.selected.after && typeof this.selected.after === 'object')
+						? Object.keys(this.selected.after) : [];
+					this.changesKeys = (this.selected.changes && typeof this.selected.changes === 'object')
+						? Object.keys(this.selected.changes) : [];
+				},
+
+				init() {
+					this.seed();
+					this.setupSignalR();
+				},
+
+				seed() {
+					const now = Date.now();
+					const seedData = [
+							{ id: 1, type: 'Create', before: null, after: { FirstName: 'John', LastName: 'Doe', Email: 'john@example.com' }, ts: now - 3600000, name: 'John Doe' },
+							{ id: 2, type: 'Create', before: null, after: { FirstName: 'Sara', LastName: 'Ahmed', Email: 'sara@gmail.com' }, ts: now - 2700000, name: 'Sara Ahmed' },
+							{ id: 3, type: 'Update', before: { FirstName: 'Sara', LastName: 'Ahmed', Email: 'sara@gmail.com' }, after: { FirstName: 'Sarah', LastName: 'Ahmed', Email: 'sarah@gmail.com' }, ts: now - 1800000, name: 'Sarah Ahmed' },
+							{ id: 4, type: 'Create', before: null, after: { FirstName: 'Omar', LastName: 'Hassan', Email: 'omar@company.com' }, ts: now - 900000, name: 'Omar Hassan' },
+							{ id: 5, type: 'Create', before: null, after: { FirstName: 'Ali', LastName: 'Khan', Email: 'ali@test.com' }, ts: now - 300000, name: 'Ali Khan' },
+							{ id: 6, type: 'Update', before: { FirstName: 'John', LastName: 'Doe', Email: 'john@example.com' }, after: { FirstName: 'Jonathan', LastName: 'Doe', Email: 'jon@example.com' }, ts: now - 100000, name: 'Jonathan Doe' }
+						];
+					seedData.sort((a, b) => b.ts - a.ts);
+					seedData.forEach((ev, i) => {
+						this.events.push({
+							uid: 'seed-' + i + '-' + ev.id,
+							id: ev.id,
+							type: ev.type,
+							before: ev.before || {},
+							after: ev.after || {},
+							name: ev.name,
+							ts: ev.ts,
+							time: new Date(ev.ts).toLocaleString(),
+							changes: this.getChanges(ev.before, ev.after),
+							isNew: false
+						});
+					});
+					this.computeTopFields();
+					this.updateCounts();
+				},
+
+				getChanges(before, after) {
+					const changes = {};
+					if (!before || !after) return changes;
+					const keys = new Set([...Object.keys(before), ...Object.keys(after)]);
+					keys.forEach(k => {
+						if (String(before[k]) !== String(after[k])) {
+							changes[k] = [before[k], after[k]];
+						}
+					});
+					return changes;
+				},
+
+				setupSignalR() {
+					this.connection = new signalR.HubConnectionBuilder()
+						.withUrl('/cdcHub')
+						.withAutomaticReconnect()
+						.build();
+
+					this.connection.on('ApplicantEvent', (evt) => {
+						this.unshiftEvent({
+							uid: evt.uid,
+							id: evt.id,
+							type: evt.type,
+							before: evt.before || {},
+							after: evt.after || {},
+							changes: evt.changes || {},
+							ts: new Date(evt.timestamp).getTime(),
+							name: evt.name,
+							time: new Date(evt.timestamp).toLocaleString()
+						});
+					});
+
+					this.connection.start().catch(err => console.error('SignalR error:', err));
+				},
+
+				unshiftEvent(ev) {
+					ev.isNew = true;
+					this.events.unshift(ev);
+					if (this.events.length > 80) this.events.pop();
+					setTimeout(() => ev.isNew = false, 1600);
+					this.computeTopFields();
+					this.updateCounts();
+				},
+
+				select(ev) {
+					const cloned = JSON.parse(JSON.stringify(ev));
+					cloned.before = cloned.before || {};
+					cloned.after = cloned.after || {};
+					cloned.changes = cloned.changes || {};
+					this.selected = cloned;
+					this.updateKeyArrays();
+				},
+
+				clearSelection() {
+					this.selected = null;
+					this.updateKeyArrays();
+				},
+
+				updateCounts() {
+					this.counts.total = this.events.length;
+					this.counts.create = this.events.filter(e => e.type === 'Create').length;
+					this.counts.update = this.events.filter(e => e.type === 'Update').length;
+					this.counts.delete = this.events.filter(e => e.type === 'Delete').length;
+				},
+
+				computeTopFields() {
+					const map = {};
+					this.events.forEach(e => {
+						if (e.changes) {
+							Object.keys(e.changes).forEach(k => map[k] = (map[k] || 0) + 1);
+						}
+					});
+					const arr = Object.keys(map).map(k => ({ name: k, count: map[k] })).sort((a, b) => b.count - a.count);
+					this.topFields = arr.slice(0, 6);
+					this.topMax = this.topFields.length ? this.topFields[0].count : 1;
+				},
+
+				formatValue(v) {
+					if (v === null || v === undefined) return '';
+					if (typeof v === 'object') return JSON.stringify(v);
+					return String(v);
+				},
+
+				getBeforeValue(k) {
+					if (!this.selected || !this.selected.before) return '';
+					return this.formatValue(this.selected.before[k]);
+				},
+
+				getAfterValue(k) {
+					if (!this.selected || !this.selected.after) return '';
+					return this.formatValue(this.selected.after[k]);
+				},
+
+				getChangeOld(k) {
+					if (!this.selected || !this.selected.changes || !this.selected.changes[k]) return '';
+					return this.formatValue(this.selected.changes[k][0]);
+				},
+
+				getChangeNew(k) {
+					if (!this.selected || !this.selected.changes || !this.selected.changes[k]) return '';
+					return this.formatValue(this.selected.changes[k][1]);
+				}
+			};
+		}
+	</script>
+}

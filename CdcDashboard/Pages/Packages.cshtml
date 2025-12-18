@@ -1,0 +1,190 @@
+@page
+@model CdcDashboard.Pages.PackagesModel
+@{
+    ViewData["Title"] = "Packages";
+    ViewData["Subtitle"] = "Price & capacity changes";
+}
+
+<div x-data="packagesApp()" x-init="init()">
+    <section class="mb-6">
+        <h2 class="text-lg font-semibold">Packages Overview</h2>
+        <p class="text-sm text-slate-500">Capacity usage, price movements, and recent updates.</p>
+    </section>
+
+    <section class="grid grid-cols-3 gap-6">
+        <template x-for="pkg in packages" :key="pkg.id">
+            <div class="bg-white rounded-2xl p-4 shadow card-hover transition-all duration-300">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <div class="text-sm text-slate-400">Package</div>
+                        <div class="text-lg font-semibold" x-text="pkg.name"></div>
+                        <div class="text-xs text-slate-400 mt-1">ID: <span x-text="pkg.id"></span></div>
+                    </div>
+                    <div class="text-right">
+                        <div class="text-xs text-slate-400">Price</div>
+                        <div class="text-lg font-semibold" x-text="''$'' + pkg.price"></div>
+                        <div class="text-xs text-amber-600 mt-1" x-show="pkg.isRecentlyChanged">Updated</div>
+                    </div>
+                </div>
+
+                <div class="mt-4 grid grid-cols-1 gap-3">
+                    <div>
+                        <div class="text-xs text-slate-400 mb-1">Capacity usage</div>
+                        <div class="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
+                            <div class="h-3 bg-emerald-500" :style="''width:'' + (pkg.used/pkg.capacity*100) + ''%''"></div>
+                        </div>
+                        <div class="text-xs text-slate-500 mt-1" x-text="pkg.used + '' / '' + pkg.capacity + '' used''"></div>
+                    </div>
+
+                    <div class="flex gap-4 items-center">
+                        <canvas :id="''spark-''+pkg.id" width="120" height="40"></canvas>
+                        <div class="text-xs text-slate-500">
+                            <div>Recent price changes</div>
+                            <div class="font-medium" x-text="pkg.priceChangeLabel"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-4 border-t pt-3 text-sm text-slate-600">
+                    <button class="text-xs px-3 py-1 rounded bg-slate-100" @@click="viewHistory(pkg)">View history</button>
+                </div>
+            </div>
+        </template>
+    </section>
+
+    <section class="mt-6 bg-white p-4 rounded-2xl shadow" x-show="activePkg" x-transition>
+        <div class="flex justify-between">
+            <div>
+                <h3 class="font-semibold">Change History  <span x-text="activePkg?.name"></span></h3>
+                <div class="text-xs text-slate-400" x-text="''ID: '' + activePkg?.id"></div>
+            </div>
+            <div><button class="text-xs px-3 py-1 rounded bg-slate-100" @@click="activePkg=null">Close</button></div>
+        </div>
+
+        <div class="mt-3 grid grid-cols-3 gap-4" x-show="activePkg">
+            <div>
+                <h4 class="text-xs text-slate-400">Price History</h4>
+                <ul class="mt-2 text-sm space-y-2">
+                    <template x-for="h in activePkg?.history || []" :key="h.ts">
+                        <li class="p-2 rounded-lg" :class="h.type===''Price'' ? ''bg-slate-50'' : ''bg-slate-100''">
+                            <div class="flex justify-between">
+                                <div><b x-text="h.label"></b></div>
+                                <div class="text-xs text-slate-400" x-text="new Date(h.ts).toLocaleString()"></div>
+                            </div>
+                            <div class="text-xs text-slate-500 mt-1" x-text="h.details"></div>
+                        </li>
+                    </template>
+                </ul>
+            </div>
+
+            <div>
+                <h4 class="text-xs text-slate-400">Capacity changes</h4>
+                <ul class="mt-2 text-sm space-y-2">
+                    <template x-for="h in (activePkg?.history || []).filter(x => x.type===''Capacity'')" :key="h.ts+''c''">
+                        <li class="p-2 rounded-lg bg-slate-50">
+                            <div class="flex justify-between">
+                                <div x-text="h.label"></div>
+                                <div class="text-xs text-slate-400" x-text="h.delta"></div>
+                            </div>
+                            <div class="text-xs text-slate-500 mt-1" x-text="new Date(h.ts).toLocaleString()"></div>
+                        </li>
+                    </template>
+                </ul>
+            </div>
+
+            <div>
+                <h4 class="text-xs text-slate-400">Recent impact</h4>
+                <div class="mt-2 text-sm text-slate-600">
+                    <div x-text="activePkg?.summary"></div>
+                </div>
+            </div>
+        </div>
+    </section>
+</div>
+
+@section Scripts {
+<script>
+    function packagesApp() {
+        return {
+            packages: [],
+            activePkg: null,
+            connection: null,
+
+            init() {
+                this.seed();
+                setTimeout(() => this.renderSparklines(), 300);
+                this.setupSignalR();
+            },
+
+            setupSignalR() {
+                this.connection = new signalR.HubConnectionBuilder()
+                    .withUrl(''/cdcHub'')
+                    .withAutomaticReconnect()
+                    .build();
+
+                this.connection.on(''PackageEvent'', (evt) => {
+                    const pkg = this.packages.find(p => p.id === evt.id);
+                    if (pkg && evt.after) {
+                        pkg.price = evt.after.price || pkg.price;
+                        pkg.capacity = evt.after.capacity || pkg.capacity;
+                        pkg.used = evt.after.capacityUsed || pkg.used;
+                        pkg.isRecentlyChanged = true;
+                        setTimeout(() => pkg.isRecentlyChanged = false, 5000);
+                    }
+                });
+
+                this.connection.start().catch(err => console.error(err));
+            },
+
+            seed() {
+                this.packages = [
+                    {
+                        id: 12, name: ''Family Pack'', price: 120, capacity: 10, used: 7, isRecentlyChanged: true, priceHistory: [115, 118, 120],
+                        priceChangeLabel: ''+$5 this week'',
+                        history: [
+                            { type: ''Price'', ts: Date.now() - 1000 * 60 * 60 * 24 * 3, label: ''Price  118'', details: ''Previous 115  118'' },
+                            { type: ''Price'', ts: Date.now() - 1000 * 60 * 60 * 24 * 1, label: ''Price  120'', details: ''Updated from 118 to 120'' },
+                            { type: ''Capacity'', ts: Date.now() - 1000 * 60 * 60 * 24 * 5, label: ''Capacity '', delta: ''+2'' }
+                        ],
+                        summary: ''In last 7 days 8 bookings affected capacity (7/10 used).''
+                    },
+                    {
+                        id: 15, name: ''Solo Package'', price: 45, capacity: 50, used: 20, isRecentlyChanged: false, priceHistory: [40, 42, 45],
+                        priceChangeLabel: ''+$5 this month'',
+                        history: [
+                            { type: ''Price'', ts: Date.now() - 1000 * 60 * 60 * 24 * 10, label: ''Price  42'', details: ''Promotional change'' },
+                            { type: ''Price'', ts: Date.now() - 1000 * 60 * 60 * 24 * 2, label: ''Price  45'', details: ''Regularized price'' }
+                        ], summary: ''Steady bookings, capacity at 40%.''
+                    },
+                    {
+                        id: 21, name: ''Couple Pack'', price: 80, capacity: 20, used: 12, isRecentlyChanged: false, priceHistory: [75, 80, 80],
+                        priceChangeLabel: ''+$5 last month'',
+                        history: [
+                            { type: ''Price'', ts: Date.now() - 1000 * 60 * 60 * 24 * 7, label: ''Price  80'', details: ''Seasonal increase'' }
+                        ], summary: ''Capacity moving towards limit.''
+                    }
+                ];
+            },
+
+            viewHistory(pkg) {
+                this.activePkg = pkg;
+            },
+
+            renderSparklines() {
+                this.packages.forEach(p => {
+                    const canvas = document.getElementById(''spark-'' + p.id);
+                    if (canvas) {
+                        const ctx = canvas.getContext(''2d'');
+                        new Chart(ctx, {
+                            type: ''line'', data: {
+                                labels: p.priceHistory.map((_, i) => i),
+                                datasets: [{ data: p.priceHistory, fill: false, borderColor: ''#F97316'', tension: 0.4, pointRadius: 0 }]
+                            }, options: { plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } }, maintainAspectRatio: false, responsive: false }
+                        });
+                    }
+                });
+            }
+        };
+    }
+</script>
+}
