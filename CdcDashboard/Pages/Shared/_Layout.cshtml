@@ -22,23 +22,165 @@
     </style>
     @await RenderSectionAsync("Styles", required: false)
 </head>
-<body class="bg-slate-50 text-slate-800">
-    <header class="bg-white shadow-sm px-6 py-4 flex items-center justify-between">
+<body class="bg-slate-50 text-slate-800" x-data="layoutApp()" x-cloak>
+    <header class="bg-white shadow-sm px-6 py-4 flex items-center justify-between relative z-10">
         <div class="flex items-center gap-4">
             <h1 class="text-lg font-semibold">CDC Dashboard</h1>
-            <nav class="text-sm text-slate-500">
-                <a asp-page="/Applicants" class="@(ViewContext.RouteData.Values["page"]?.ToString() == "/Applicants" ? "text-indigo-600 font-medium" : "hover:text-indigo-600")">Applicants</a>
-                <a asp-page="/Bookings" class="ml-4 @(ViewContext.RouteData.Values["page"]?.ToString() == "/Bookings" ? "text-indigo-600 font-medium" : "hover:text-indigo-600")">Bookings</a>
-                <a asp-page="/Packages" class="ml-4 @(ViewContext.RouteData.Values["page"]?.ToString() == "/Packages" ? "text-indigo-600 font-medium" : "hover:text-indigo-600")">Packages</a>
+            <nav class="text-sm text-slate-500 flex gap-6">
+                <div class="relative inline-flex">
+                    <a asp-page="/Applicants" @@click="reset('applicants')"
+                       class="inline-flex items-center px-3 py-2 transition-colors rounded-md hover:bg-slate-50"
+                       :class="isActive('/Applicants') ? 'text-indigo-600 font-medium bg-slate-50' : 'hover:text-indigo-600'">
+                       Applicants
+                    </a>
+                    <span x-show="counts.applicants > 0" x-text="counts.applicants" 
+                          x-transition.scale.origin.center
+                          class="absolute top-0 right-0 translate-x-1/2 -translate-y-1/2 flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-rose-500 text-[10px] text-white shadow-sm ring-2 ring-white z-20 pointer-events-none">
+                    </span>
+                </div>
+
+                <div class="relative inline-flex">
+                    <a asp-page="/Bookings" @@click="reset('bookings')"
+                       class="inline-flex items-center px-3 py-2 transition-colors rounded-md hover:bg-slate-50"
+                       :class="isActive('/Bookings') ? 'text-indigo-600 font-medium bg-slate-50' : 'hover:text-indigo-600'">
+                       Bookings
+                    </a>
+                    <span x-show="counts.bookings > 0" x-text="counts.bookings" 
+                          x-transition.scale.origin.center
+                          class="absolute top-0 right-0 translate-x-1/2 -translate-y-1/2 flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-rose-500 text-[10px] text-white shadow-sm ring-2 ring-white z-20 pointer-events-none">
+                    </span>
+                </div>
+
+                <div class="relative inline-flex">
+                    <a asp-page="/Packages" @@click="reset('packages')"
+                       class="inline-flex items-center px-3 py-2 transition-colors rounded-md hover:bg-slate-50"
+                       :class="isActive('/Packages') ? 'text-indigo-600 font-medium bg-slate-50' : 'hover:text-indigo-600'">
+                       Packages
+                    </a>
+                    <span x-show="counts.packages > 0" x-text="counts.packages" 
+                          x-transition.scale.origin.center
+                          class="absolute top-0 right-0 translate-x-1/2 -translate-y-1/2 flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-rose-500 text-[10px] text-white shadow-sm ring-2 ring-white z-20 pointer-events-none">
+                    </span>
+                </div>
             </nav>
         </div>
         <div class="text-sm text-slate-500">@ViewData["Subtitle"]</div>
     </header>
 
-    <main class="p-6">
+    <main class="p-6 relative z-0">
         @RenderBody()
     </main>
 
+    <!-- Toast Notification -->
+    <div class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none">
+        <template x-for="t in toasts" :key="t.id">
+            <div class="bg-white border-l-4 border-indigo-500 shadow-lg rounded-r p-4 w-72 transform transition-all duration-300 pointer-events-auto flex items-start text-left"
+                 x-show="t.visible"
+                 x-transition:enter="translate-y-10 opacity-0"
+                 x-transition:enter-end="translate-y-0 opacity-100"
+                 x-transition:leave="translate-x-full opacity-0">
+                <div class="flex-1">
+                    <div class="text-sm font-semibold text-slate-800" x-text="t.title"></div>
+                    <div class="text-xs text-slate-500 mt-1" x-text="t.message"></div>
+                </div>
+                <button class="text-slate-400 hover:text-slate-600" @@click="closeToast(t.id)">×</button>
+            </div>
+        </template>
+    </div>
+
     @await RenderSectionAsync("Scripts", required: false)
+
+    <script>
+        function layoutApp() {
+            return {
+                counts: { applicants: 0, bookings: 0, packages: 0 },
+                toasts: [],
+                connection: null,
+
+                init() {
+                    this.loadCounts();
+                    this.setupSignalR();
+                    
+                    // Reset count for current page immediately
+                    const path = window.location.pathname.toLowerCase();
+                    if (path.includes('applicants')) this.reset('applicants');
+                    if (path.includes('bookings')) this.reset('bookings');
+                    if (path.includes('packages')) this.reset('packages');
+                },
+
+                isActive(route) {
+                    return window.location.pathname.toLowerCase().includes(route.toLowerCase());
+                },
+
+                reset(key) {
+                    this.counts[key] = 0;
+                    this.saveCounts();
+                },
+
+                loadCounts() {
+                    const stored = sessionStorage.getItem('navCounts');
+                    if (stored) {
+                        try {
+                            this.counts = JSON.parse(stored);
+                        } catch(e) { console.error('Failed to parse counts', e); }
+                    }
+                },
+
+                saveCounts() {
+                    sessionStorage.setItem('navCounts', JSON.stringify(this.counts));
+                },
+
+                handleEvent(type, name, message) {
+                    const pageMap = {
+                        'applicant': 'applicants',
+                        'booking': 'bookings',
+                        'package': 'packages'
+                    };
+                    const key = pageMap[type];
+                    if (!key) return;
+
+                    const currentPath = window.location.pathname.toLowerCase();
+                    const isPageActive = currentPath.includes(key);
+
+                    if (isPageActive) {
+                        // Toast only
+                        this.showToast('New ' + type + ' event', message || name);
+                    } else {
+                        // Badge only
+                        this.counts[key]++;
+                        this.saveCounts();
+                    }
+                },
+
+                showToast(title, message) {
+                    const id = Date.now();
+                    const toast = { id, title, message, visible: true };
+                    this.toasts.push(toast);
+                    setTimeout(() => this.closeToast(id), 5000);
+                },
+
+                closeToast(id) {
+                    const idx = this.toasts.findIndex(t => t.id === id);
+                    if (idx > -1) {
+                        this.toasts[idx].visible = false;
+                        setTimeout(() => this.toasts = this.toasts.filter(t => t.id !== id), 300);
+                    }
+                },
+
+                setupSignalR() {
+                    this.connection = new signalR.HubConnectionBuilder()
+                        .withUrl('/cdcHub')
+                        .withAutomaticReconnect()
+                        .build();
+
+                    this.connection.on('ApplicantEvent', (evt) => this.handleEvent('applicant', evt.name, (evt.type + ' ' + (evt.name || 'Application'))));
+                    this.connection.on('BookingEvent', (evt) => this.handleEvent('booking', 'Booking #' + evt.id, evt.type + ' Status: ' + (evt.after?.statusName || '?')));
+                    this.connection.on('PackageEvent', (evt) => this.handleEvent('package', evt.after?.name || 'Package', evt.type + ' Price: $' + (evt.after?.price || 0)));
+
+                    this.connection.start().catch(err => console.error('Layout SignalR error:', err));
+                }
+            };
+        }
+    </script>
 </body>
 </html>

@@ -5,7 +5,7 @@
 	ViewData["Subtitle"] = "Real-time  CDC feed";
 }
 
-<div x-data="applicantsApp()" x-init="init(@Json.Serialize(Model.InitialEvents))">
+<div x-data="applicantsApp()" x-init="init(window.initialApplicantEvents)">
 	<!-- top summary + analytics row -->
 	<section class="mb-6 grid grid-cols-12 gap-6">
 		<!-- Summary Cards -->
@@ -157,6 +157,10 @@
 
 @using System.Text.Json
 @section Scripts {
+    <script>
+        // Inject server-side data into a global variable to avoid HTML attribute quoting issues
+        window.initialApplicantEvents = @Json.Serialize(Model.InitialEvents);
+    </script>
 	<script>
 		function applicantsApp() {
 			return {

@@ -105,6 +105,9 @@
 @using System.Text.Json
 @section Scripts {
 <script>
+    window.initialPackageEvents = @Json.Serialize(Model.InitialEvents);
+</script>
+<script>
     function packagesApp() {
         return {
             packages: [],
