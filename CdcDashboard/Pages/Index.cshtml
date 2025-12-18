@@ -1,0 +1,54 @@
+@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Dashboard";
+    ViewData["Subtitle"] = "CDC Monitor Overview";
+}
+
+<div class="grid grid-cols-2 gap-6">
+    <a asp-page="/Applicants" class="bg-white rounded-2xl p-6 shadow hover:shadow-lg transition cursor-pointer">
+        <h2 class="text-xl font-semibold text-indigo-600">Applicants</h2>
+        <p class="text-sm text-slate-500 mt-2">Monitor real-time applicant changes - creates, updates, and deletes</p>
+        <div class="mt-4 text-xs text-slate-400">View timeline, inspect changes, and track field updates</div>
+    </a>
+    
+    <a asp-page="/Bookings" class="bg-white rounded-2xl p-6 shadow hover:shadow-lg transition cursor-pointer">
+        <h2 class="text-xl font-semibold text-indigo-600">Bookings</h2>
+        <p class="text-sm text-slate-500 mt-2">Track booking status flows and revenue metrics in real-time</p>
+        <div class="mt-4 text-xs text-slate-400">View KPIs, status distribution, and booking events</div>
+    </a>
+    
+    <a asp-page="/Packages" class="bg-white rounded-2xl p-6 shadow hover:shadow-lg transition cursor-pointer">
+        <h2 class="text-xl font-semibold text-indigo-600">Packages</h2>
+        <p class="text-sm text-slate-500 mt-2">Monitor package price changes and capacity utilization</p>
+        <div class="mt-4 text-xs text-slate-400">View sparklines, history, and capacity metrics</div>
+    </a>
+    
+    <a asp-page="/Shared" class="bg-white rounded-2xl p-6 shadow hover:shadow-lg transition cursor-pointer">
+        <h2 class="text-xl font-semibold text-indigo-600">Shared</h2>
+        <p class="text-sm text-slate-500 mt-2">Track file sharing activities and collaboration events</p>
+        <div class="mt-4 text-xs text-slate-400">View top sharers, share events, and file status</div>
+    </a>
+</div>
+
+<div class="mt-8 bg-white rounded-2xl p-6 shadow">
+    <h3 class="text-lg font-semibold mb-4">About CDC Dashboard</h3>
+    <p class="text-sm text-slate-600">
+        This dashboard monitors Change Data Capture (CDC) events from your database via Debezium and RabbitMQ.
+        Real-time updates are pushed to the UI using SignalR.
+    </p>
+    <div class="mt-4 grid grid-cols-3 gap-4 text-sm">
+        <div class="p-3 bg-slate-50 rounded-lg">
+            <div class="font-medium text-emerald-600">Creates</div>
+            <div class="text-xs text-slate-500">New records inserted into the database</div>
+        </div>
+        <div class="p-3 bg-slate-50 rounded-lg">
+            <div class="font-medium text-amber-600">Updates</div>
+            <div class="text-xs text-slate-500">Existing records modified with field changes</div>
+        </div>
+        <div class="p-3 bg-slate-50 rounded-lg">
+            <div class="font-medium text-rose-600">Deletes</div>
+            <div class="text-xs text-slate-500">Records removed from the database</div>
+        </div>
+    </div>
+</div>
