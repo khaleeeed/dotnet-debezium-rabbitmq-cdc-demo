@@ -5,7 +5,7 @@
     ViewData["Subtitle"] = "Status flows  realtime";
 }
 
-<div x-data="bookingsApp()" x-init="init()">
+<div x-data="bookingsApp()">
     <!-- KPIs -->
     <section class="grid grid-cols-4 gap-6 mb-6">
         <div class="bg-white rounded-2xl p-4 shadow">
@@ -28,31 +28,16 @@
 
     <!-- charts + stream -->
     <section class="grid grid-cols-8 gap-6">
-        <div class="col-span-5 bg-white rounded-2xl p-4 shadow">
-            <h2 class="text-sm font-semibold mb-3">Status distribution (last 7 days)</h2>
-            <canvas id="statusChart" height="160"></canvas>
-
-            <div class="mt-4">
-                <h3 class="text-sm font-semibold mb-2">Status Flow (last 24h)</h3>
-                <div class="flex items-center gap-2">
-                    <div class="flow-bar" style="width:35%; background:#FDE68A"></div>
-                    <div class="flow-bar" style="width:45%; background:#60A5FA"></div>
-                    <div class="flow-bar" style="width:20%; background:#FCA5A5"></div>
-                    <div class="text-xs text-slate-400 ml-3">Pending  Confirmed  Cancelled</div>
-                </div>
-            </div>
-        </div>
-
-        <div class="col-span-3 bg-white rounded-2xl p-4 shadow max-h-[62vh] overflow-y-auto">
+        <div class="col-span-3 bg-white rounded-2xl p-4 shadow h-[62vh] overflow-y-auto">
             <div class="flex justify-between items-center mb-3">
                 <h3 class="text-sm font-semibold">Recent Booking Events</h3>
-                <button class="text-xs px-3 py-1 rounded bg-slate-100" @@click="pushDemo()">Push demo</button>
+                <div class="text-xs text-slate-400">Live</div>
             </div>
 
             <template x-for="b in events" :key="b.uid">
-                <div class="p-3 mb-3 rounded-lg border flex justify-between items-start transition hover:shadow" @@click="selected = b">
+                <div class="p-3 mb-3 rounded-lg border flex justify-between items-start transition hover:shadow cursor-pointer" x-on:click="selected = b">
                     <div class="w-3/4">
-                        <div class="text-sm font-medium" x-text="''#'' + b.id + ''  '' + b.action"></div>
+                        <div class="text-sm font-medium" x-text="'#' + b.id + '  ' + b.action"></div>
                         <div class="text-xs text-slate-400" x-text="b.time"></div>
 
                         <div class="mt-2 text-xs">
@@ -73,51 +58,85 @@
 
                     <div class="text-right text-xs">
                         <div class="mb-2">
-                            <span class="px-2 py-1 rounded-full text-white text-xs" :class="b.status===''Confirmed''?''bg-indigo-600'':(b.status===''Pending''?''bg-amber-500'':''bg-rose-500'')" x-text="b.status"></span>
+                            <span class="px-2 py-1 rounded-full text-white text-xs" :class="b.status==='Confirmed'?'bg-indigo-600':(b.status==='Pending'?'bg-amber-500':'bg-rose-500')" x-text="b.status"></span>
                         </div>
                         <div class="text-slate-400" x-text="timeAgo(b.ts)"></div>
                     </div>
                 </div>
             </template>
         </div>
-    </section>
 
-    <!-- detail panel -->
-    <section class="mt-6 bg-white p-4 rounded-2xl shadow" x-show="selected" x-transition>
-        <div class="flex justify-between items-center">
-            <div>
-                <h3 class="font-semibold">Booking Detail  <span x-text="''#'' + selected?.id"></span></h3>
-                <div class="text-xs text-slate-400" x-text="selected?.time"></div>
-            </div>
-            <div>
-                <button class="text-xs px-3 py-1 rounded bg-slate-100" @@click="selected=null">Close</button>
-            </div>
-        </div>
+        <div class="col-span-5 flex flex-col gap-6 h-[62vh]">
+            <!-- Chart section -->
+            <div class="bg-white rounded-2xl p-4 shadow flex-[2] overflow-hidden flex flex-col">
+                <h2 class="text-sm font-semibold mb-3">Status distribution (last 7 days)</h2>
+                <div class="flex-1 min-h-0">
+                    <canvas id="statusChart"></canvas>
+                </div>
 
-        <div class="mt-3 grid grid-cols-3 gap-4" x-show="selected">
-            <div>
-                <div class="text-xs text-slate-400">Applicant</div>
-                <div class="font-medium" x-text="selected?.applicant"></div>
-            </div>
-            <div>
-                <div class="text-xs text-slate-400">Package</div>
-                <div class="font-medium" x-text="selected?.package?.name"></div>
-            </div>
-            <div>
-                <div class="text-xs text-slate-400">Amount</div>
-                <div class="font-medium" x-text="''$'' + selected?.amount"></div>
-            </div>
-        </div>
-
-        <div class="mt-4" x-show="selected">
-            <h4 class="text-sm font-semibold">Status Timeline</h4>
-            <div class="mt-2 flex gap-2">
-                <template x-for="s in selected?.history || []" :key="s.status">
-                    <div class="p-2 rounded-lg bg-slate-50 text-xs shadow" :class="s.status===''Confirmed''?''bg-indigo-50'':''''">
-                        <div class="font-medium" x-text="s.status"></div>
-                        <div class="text-xs text-slate-400" x-text="s.time"></div>
+                <div class="mt-4">
+                    <h3 class="text-sm font-semibold mb-2">Status Flow (last 24h)</h3>
+                    <div class="flex items-center gap-2">
+                        <div class="flow-bar transition-all duration-300" :style="'width:' + getFlowPercent('pending') + '; background:#FDE68A'"></div>
+                        <div class="flow-bar transition-all duration-300" :style="'width:' + getFlowPercent('confirmed') + '; background:#60A5FA'"></div>
+                        <div class="flow-bar transition-all duration-300" :style="'width:' + getFlowPercent('cancelled') + '; background:#FCA5A5'"></div>
                     </div>
-                </template>
+                    <div class="flex justify-between text-xs text-slate-400 mt-2">
+                        <span>Pending: <span x-text="statusFlow.pending"></span></span>
+                        <span>Confirmed: <span x-text="statusFlow.confirmed"></span></span>
+                        <span>Cancelled: <span x-text="statusFlow.cancelled"></span></span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- detail panel -->
+            <div class="bg-white p-4 rounded-2xl shadow" x-show="selected" x-transition>
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h3 class="font-semibold">Booking Detail  <span x-text="'#' + selected?.id"></span></h3>
+                        <div class="text-xs text-slate-400" x-text="selected?.time"></div>
+                    </div>
+                    <div>
+                        <button class="text-xs px-3 py-1 rounded bg-slate-100" x-on:click="selected=null">Close</button>
+                    </div>
+                </div>
+
+                <div class="mt-3 grid grid-cols-3 gap-4" x-show="selected">
+                    <div>
+                        <div class="text-xs text-slate-400">Applicant</div>
+                        <div class="font-medium" x-text="selected?.applicant"></div>
+                    </div>
+                    <div>
+                        <div class="text-xs text-slate-400">Package</div>
+                        <div class="font-medium" x-text="selected?.package?.name"></div>
+                    </div>
+                    <div>
+                        <div class="text-xs text-slate-400">Amount</div>
+                        <div class="font-medium" x-text="'$' + selected?.amount"></div>
+                    </div>
+                </div>
+
+                <div class="mt-4" x-show="selected">
+                    <h4 class="text-sm font-semibold">Status Timeline</h4>
+                    <div class="mt-2 flex gap-2">
+                        <template x-for="(s, index) in (selected?.history || [])" :key="index">
+                            <div class="p-2 rounded-lg bg-slate-50 text-xs shadow" :class="s.status==='Confirmed'?'bg-indigo-50':''">
+                                <div class="font-medium" x-text="s.status"></div>
+                                <div class="text-xs text-slate-400" x-text="s.time"></div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Placeholder when no selection -->
+            <div class="bg-white p-4 rounded-2xl shadow flex items-center justify-center" x-show="!selected">
+                <div class="text-center text-slate-400 py-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 mx-auto mb-2 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                    <p class="text-sm">Select a booking to view details</p>
+                </div>
             </div>
         </div>
     </section>
@@ -129,96 +148,189 @@
         return {
             events: [],
             selected: null,
-            kpi: { today: 142, revenue: ''$12,450'', pending: 38, confirmed: 90 },
+            kpi: { today: 0, revenue: '$0', pending: 0, confirmed: 0 },
             chart: null,
             connection: null,
+            statusFlow: { pending: 0, confirmed: 0, cancelled: 0 },
 
             init() {
                 this.seed();
+                this.updateKpi();
                 this.renderChart();
                 this.setupSignalR();
-                setInterval(() => this.pushDemo(), 3000);
             },
 
             setupSignalR() {
                 this.connection = new signalR.HubConnectionBuilder()
-                    .withUrl(''/cdcHub'')
+                    .withUrl('/cdcHub')
                     .withAutomaticReconnect()
                     .build();
 
-                this.connection.on(''BookingEvent'', (evt) => {
+                this.connection.on('BookingEvent', (evt) => {
                     const b = this.makeBookingEvent(
                         evt.id,
                         evt.type,
-                        evt.after?.statusName || ''Pending'',
+                        evt.after?.statusName || 'Pending',
                         evt.after?.amount || 0,
                         evt.changes || {}
                     );
                     this.events.unshift(b);
                     if (this.events.length > 50) this.events.pop();
+                    this.updateKpi();
+                    this.updateChartData();
                 });
 
-                this.connection.start().catch(err => console.error(err));
+                this.connection.start().catch(err => console.error('SignalR error:', err));
             },
 
             seed() {
-                this.events = [
-                    this.makeBookingEvent(9821, ''Update'', ''Confirmed'', 150, { BookingStatus: [1, 2] }),
-                    this.makeBookingEvent(9814, ''Create'', ''Pending'', 50),
-                    this.makeBookingEvent(9802, ''Update'', ''Cancelled'', 0, { BookingStatus: [2, 0] })
+                const now = Date.now();
+                const seedData = [
+                    { id: 9821, action: 'Update', status: 'Confirmed', amount: 150, changes: { BookingStatus: ['Pending', 'Confirmed'] }, ts: now - 3600000, applicant: 'John Doe', package: 'Family Pack' },
+                    { id: 9814, action: 'Create', status: 'Pending', amount: 50, changes: {}, ts: now - 2700000, applicant: 'Sara Ahmed', package: 'Solo Pack' },
+                    { id: 9802, action: 'Update', status: 'Cancelled', amount: 80, changes: { BookingStatus: ['Confirmed', 'Cancelled'] }, ts: now - 1800000, applicant: 'Omar Hassan', package: 'Couple Pack' },
+                    { id: 9798, action: 'Create', status: 'Pending', amount: 120, changes: {}, ts: now - 900000, applicant: 'Ali Khan', package: 'Family Pack' },
+                    { id: 9795, action: 'Update', status: 'Confirmed', amount: 80, changes: { BookingStatus: ['Pending', 'Confirmed'] }, ts: now - 300000, applicant: 'Fatima Noor', package: 'Couple Pack' },
+                    { id: 9790, action: 'Create', status: 'Pending', amount: 45, changes: {}, ts: now - 100000, applicant: 'Ahmed Raza', package: 'Solo Pack' },
+                    { id: 9785, action: 'Update', status: 'Confirmed', amount: 200, changes: { BookingStatus: ['Pending', 'Confirmed'] }, ts: now - 86400000, applicant: 'Layla Hassan', package: 'Family Pack' },
+                    { id: 9780, action: 'Create', status: 'Confirmed', amount: 95, changes: {}, ts: now - 172800000, applicant: 'Yusuf Ali', package: 'Couple Pack' },
+                    { id: 9775, action: 'Update', status: 'Cancelled', amount: 60, changes: { BookingStatus: ['Pending', 'Cancelled'] }, ts: now - 259200000, applicant: 'Nadia Khan', package: 'Solo Pack' },
+                    { id: 9770, action: 'Create', status: 'Confirmed', amount: 180, changes: {}, ts: now - 345600000, applicant: 'Tariq Mahmoud', package: 'Family Pack' }
                 ];
-            },
-
-            pushDemo() {
-                const id = Math.floor(Math.random() * 9000) + 9000;
-                const statuses = [''Pending'', ''Confirmed'', ''Cancelled''];
-                const st = statuses[Math.floor(Math.random() * statuses.length)];
-                const ev = this.makeBookingEvent(id, (Math.random() > 0.5 ? ''Create'' : ''Update''), st, Math.floor(Math.random() * 400) + 10);
-                this.events.unshift(ev);
-                if (this.events.length > 50) this.events.pop();
-                this.selected = ev;
-                setTimeout(() => this.selected = null, 4000);
-                this.updateChartData();
+                seedData.sort((a, b) => b.ts - a.ts);
+                seedData.forEach((ev, i) => {
+                    const history = ev.action === 'Create' 
+                        ? [{ status: ev.status, time: new Date(ev.ts).toLocaleString() }]
+                        : [
+                            { status: 'Pending', time: new Date(ev.ts - 1000 * 60 * 60 * 24).toLocaleString() },
+                            { status: ev.status, time: new Date(ev.ts).toLocaleString() }
+                        ];
+                    this.events.push({
+                        uid: 'seed-' + i + '-' + ev.id,
+                        id: ev.id,
+                        action: ev.action,
+                        status: ev.status,
+                        amount: ev.amount,
+                        time: new Date(ev.ts).toLocaleString(),
+                        ts: ev.ts,
+                        changes: ev.changes || {},
+                        applicant: ev.applicant,
+                        package: { name: ev.package, price: ev.amount },
+                        history: history
+                    });
+                });
             },
 
             makeBookingEvent(id, action, status, amount, changes) {
-                const ts = Date.now() - Math.floor(Math.random() * 1000 * 60 * 60 * 24);
+                const ts = Date.now();
+                const history = action === 'Create'
+                    ? [{ status: status, time: new Date(ts).toLocaleString() }]
+                    : [
+                        { status: 'Pending', time: new Date(ts - 1000 * 60 * 60 * 24).toLocaleString() },
+                        { status: status, time: new Date(ts).toLocaleString() }
+                    ];
                 return {
-                    uid: ''be-'' + id + ''-'' + Math.random().toString(36).slice(2, 6),
+                    uid: 'be-' + id + '-' + Math.random().toString(36).slice(2, 6),
                     id, action, status, amount, time: new Date(ts).toLocaleString(), ts,
                     changes: changes || {},
-                    applicant: ''Applicant '' + (Math.floor(Math.random() * 50) + 1),
-                    package: { name: [''Family Pack'', ''Solo Pack'', ''Couple Pack''][Math.floor(Math.random() * 3)], price: [120, 45, 80][Math.floor(Math.random() * 3)] },
-                    history: [
-                        { status: ''Pending'', time: new Date(ts - 1000 * 60 * 60 * 24).toLocaleString() },
-                        { status: status, time: new Date(ts).toLocaleString() }
-                    ]
+                    applicant: 'Applicant ' + (Math.floor(Math.random() * 50) + 1),
+                    package: { name: ['Family Pack', 'Solo Pack', 'Couple Pack'][Math.floor(Math.random() * 3)], price: amount },
+                    history: history
                 };
+            },
+
+            updateKpi() {
+                const todayStart = new Date();
+                todayStart.setHours(0, 0, 0, 0);
+                const todayEvents = this.events.filter(e => e.ts >= todayStart.getTime());
+
+                this.kpi.today = todayEvents.length;
+                this.kpi.pending = this.events.filter(e => e.status === 'Pending').length;
+                this.kpi.confirmed = this.events.filter(e => e.status === 'Confirmed').length;
+
+                const todayRevenue = todayEvents
+                    .filter(e => e.status === 'Confirmed')
+                    .reduce((sum, e) => sum + (e.amount || 0), 0);
+                this.kpi.revenue = '$' + todayRevenue.toLocaleString();
+
+                // Update status flow for last 24h
+                const last24h = Date.now() - (24 * 60 * 60 * 1000);
+                const recentEvents = this.events.filter(e => e.ts >= last24h);
+                this.statusFlow.pending = recentEvents.filter(e => e.status === 'Pending').length;
+                this.statusFlow.confirmed = recentEvents.filter(e => e.status === 'Confirmed').length;
+                this.statusFlow.cancelled = recentEvents.filter(e => e.status === 'Cancelled').length;
+            },
+
+            getFlowPercent(status) {
+                const total = this.statusFlow.pending + this.statusFlow.confirmed + this.statusFlow.cancelled;
+                if (total === 0) return '0%';
+                const value = this.statusFlow[status] || 0;
+                return Math.round((value / total) * 100) + '%';
             },
 
             timeAgo(ts) {
                 const d = Math.floor((Date.now() - ts) / 1000);
-                if (d < 60) return d + ''s ago'';
-                if (d < 3600) return Math.floor(d / 60) + ''m ago'';
-                return Math.floor(d / 3600) + ''h ago'';
+                if (d < 60) return d + 's ago';
+                if (d < 3600) return Math.floor(d / 60) + 'm ago';
+                return Math.floor(d / 3600) + 'h ago';
             },
 
             renderChart() {
-                const ctx = document.getElementById(''statusChart'').getContext(''2d'');
+                const ctx = document.getElementById('statusChart').getContext('2d');
                 const days = this.lastNDays(7);
+                const chartData = this.getChartData(days);
+
                 this.chart = new Chart(ctx, {
-                    type: ''bar'', data: {
+                    type: 'bar',
+                    data: {
                         labels: days,
                         datasets: [
-                            { label: ''Pending'', data: days.map(() => this.randInt(5, 20)), backgroundColor: ''#F59E0B'' },
-                            { label: ''Confirmed'', data: days.map(() => this.randInt(30, 80)), backgroundColor: ''#3B82F6'' },
-                            { label: ''Cancelled'', data: days.map(() => this.randInt(1, 10)), backgroundColor: ''#F87171'' }
+                            { label: 'Pending', data: chartData.pending, backgroundColor: '#F59E0B' },
+                            { label: 'Confirmed', data: chartData.confirmed, backgroundColor: '#3B82F6' },
+                            { label: 'Cancelled', data: chartData.cancelled, backgroundColor: '#F87171' }
                         ]
-                    }, options: { responsive: true, scales: { x: { stacked: true }, y: { stacked: true } } }
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            x: { stacked: true },
+                            y: { stacked: true, beginAtZero: true }
+                        }
+                    }
                 });
             },
 
-            updateChartData() { },
+            getChartData(days) {
+                const data = {
+                    pending: [],
+                    confirmed: [],
+                    cancelled: []
+                };
+
+                days.forEach(day => {
+                    const dayStart = new Date(day).getTime();
+                    const dayEnd = dayStart + (24 * 60 * 60 * 1000);
+                    const dayEvents = this.events.filter(e => e.ts >= dayStart && e.ts < dayEnd);
+
+                    data.pending.push(dayEvents.filter(e => e.status === 'Pending').length);
+                    data.confirmed.push(dayEvents.filter(e => e.status === 'Confirmed').length);
+                    data.cancelled.push(dayEvents.filter(e => e.status === 'Cancelled').length);
+                });
+
+                return data;
+            },
+
+            updateChartData() {
+                if (!this.chart) return;
+                const days = this.lastNDays(7);
+                const chartData = this.getChartData(days);
+
+                this.chart.data.datasets[0].data = chartData.pending;
+                this.chart.data.datasets[1].data = chartData.confirmed;
+                this.chart.data.datasets[2].data = chartData.cancelled;
+                this.chart.update();
+            },
 
             lastNDays(n) {
                 const r = [];
@@ -228,9 +340,7 @@
                     r.push(d.toISOString().slice(0, 10));
                 }
                 return r;
-            },
-
-            randInt(a, b) { return Math.floor(Math.random() * (b - a)) + a; }
+            }
         };
     }
 </script>

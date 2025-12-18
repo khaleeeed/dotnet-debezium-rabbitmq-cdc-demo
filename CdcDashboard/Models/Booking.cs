@@ -26,9 +26,9 @@ public class Booking
 
     public string StatusName => BookingStatus switch
     {
-        0 => "Cancelled",
         1 => "Pending",
         2 => "Confirmed",
+        3 => "Cancelled",
         _ => "Unknown"
     };
 }
