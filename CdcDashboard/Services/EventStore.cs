@@ -5,40 +5,40 @@ namespace CdcDashboard.Services;
 
 public class EventStore
 {
-    private readonly ConcurrentQueue<ApplicantEvent> _applicantEvents = new();
-    private readonly ConcurrentQueue<BookingEvent> _bookingEvents = new();
-    private readonly ConcurrentQueue<PackageEvent> _packageEvents = new();
+    public readonly ConcurrentQueue<ApplicantEvent> ApplicantEvents = new();
+    public readonly ConcurrentQueue<BookingEvent> BookingEvents = new();
+    public readonly ConcurrentQueue<PackageEvent> PackageEvents = new();
     
     private const int MaxEvents = 100;
 
     public void AddApplicantEvent(ApplicantEvent evt)
     {
-        _applicantEvents.Enqueue(evt);
-        while (_applicantEvents.Count > MaxEvents)
-            _applicantEvents.TryDequeue(out _);
+        ApplicantEvents.Enqueue(evt);
+        while (ApplicantEvents.Count > MaxEvents)
+            ApplicantEvents.TryDequeue(out _);
     }
 
     public void AddBookingEvent(BookingEvent evt)
     {
-        _bookingEvents.Enqueue(evt);
-        while (_bookingEvents.Count > MaxEvents)
-            _bookingEvents.TryDequeue(out _);
+        BookingEvents.Enqueue(evt);
+        while (BookingEvents.Count > MaxEvents)
+            BookingEvents.TryDequeue(out _);
     }
 
     public void AddPackageEvent(PackageEvent evt)
     {
-        _packageEvents.Enqueue(evt);
-        while (_packageEvents.Count > MaxEvents)
-            _packageEvents.TryDequeue(out _);
+        PackageEvents.Enqueue(evt);
+        while (PackageEvents.Count > MaxEvents)
+            PackageEvents.TryDequeue(out _);
     }
 
-    public IEnumerable<ApplicantEvent> GetApplicantEvents() => _applicantEvents.Reverse();
-    public IEnumerable<BookingEvent> GetBookingEvents() => _bookingEvents.Reverse();
-    public IEnumerable<PackageEvent> GetPackageEvents() => _packageEvents.Reverse();
+    public IEnumerable<ApplicantEvent> GetApplicantEvents() => ApplicantEvents.Reverse();
+    public IEnumerable<BookingEvent> GetBookingEvents() => BookingEvents.Reverse();
+    public IEnumerable<PackageEvent> GetPackageEvents() => PackageEvents.Reverse();
 
     public (int Creates, int Updates, int Deletes) GetApplicantCounts()
     {
-        var events = _applicantEvents.ToList();
+        var events = ApplicantEvents.ToList();
         return (
             events.Count(e => e.Type == "Create"),
             events.Count(e => e.Type == "Update"),
@@ -48,7 +48,7 @@ public class EventStore
 
     public (int Today, decimal Revenue, int Pending, int Confirmed) GetBookingKpis()
     {
-        var events = _bookingEvents.ToList();
+        var events = BookingEvents.ToList();
         var today = events.Count(e => e.Timestamp.Date == DateTime.UtcNow.Date);
         var revenue = events.Where(e => e.After?.Amount != null).Sum(e => e.After!.Amount!.Value);
         var pending = events.Count(e => e.After?.BookingStatus == 1);

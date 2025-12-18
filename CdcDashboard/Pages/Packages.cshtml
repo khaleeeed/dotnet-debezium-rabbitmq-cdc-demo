@@ -5,7 +5,7 @@
     ViewData["Subtitle"] = "Price & capacity changes";
 }
 
-<div x-data="packagesApp()" x-init="init()">
+<div x-data="packagesApp()">
     <section class="mb-6">
         <h2 class="text-lg font-semibold">Packages Overview</h2>
         <p class="text-sm text-slate-500">Capacity usage, price movements, and recent updates.</p>
@@ -22,7 +22,7 @@
                     </div>
                     <div class="text-right">
                         <div class="text-xs text-slate-400">Price</div>
-                        <div class="text-lg font-semibold" x-text="''$'' + pkg.price"></div>
+                        <div class="text-lg font-semibold" x-text="'$' + pkg.price"></div>
                         <div class="text-xs text-amber-600 mt-1" x-show="pkg.isRecentlyChanged">Updated</div>
                     </div>
                 </div>
@@ -31,13 +31,13 @@
                     <div>
                         <div class="text-xs text-slate-400 mb-1">Capacity usage</div>
                         <div class="w-full bg-slate-100 h-3 rounded-full overflow-hidden">
-                            <div class="h-3 bg-emerald-500" :style="''width:'' + (pkg.used/pkg.capacity*100) + ''%''"></div>
+                            <div class="h-3 bg-emerald-500" :style="'width:' + (pkg.used/pkg.capacity*100) + '%'"></div>
                         </div>
-                        <div class="text-xs text-slate-500 mt-1" x-text="pkg.used + '' / '' + pkg.capacity + '' used''"></div>
+                        <div class="text-xs text-slate-500 mt-1" x-text="pkg.used + ' / ' + pkg.capacity + ' used'"></div>
                     </div>
 
                     <div class="flex gap-4 items-center">
-                        <canvas :id="''spark-''+pkg.id" width="120" height="40"></canvas>
+                        <canvas :id="'spark-'+pkg.id" width="120" height="40"></canvas>
                         <div class="text-xs text-slate-500">
                             <div>Recent price changes</div>
                             <div class="font-medium" x-text="pkg.priceChangeLabel"></div>
@@ -56,7 +56,7 @@
         <div class="flex justify-between">
             <div>
                 <h3 class="font-semibold">Change History  <span x-text="activePkg?.name"></span></h3>
-                <div class="text-xs text-slate-400" x-text="''ID: '' + activePkg?.id"></div>
+                <div class="text-xs text-slate-400" x-text="'ID: ' + activePkg?.id"></div>
             </div>
             <div><button class="text-xs px-3 py-1 rounded bg-slate-100" @@click="activePkg=null">Close</button></div>
         </div>
@@ -66,7 +66,7 @@
                 <h4 class="text-xs text-slate-400">Price History</h4>
                 <ul class="mt-2 text-sm space-y-2">
                     <template x-for="h in activePkg?.history || []" :key="h.ts">
-                        <li class="p-2 rounded-lg" :class="h.type===''Price'' ? ''bg-slate-50'' : ''bg-slate-100''">
+                        <li class="p-2 rounded-lg" :class="h.type==='Price' ? 'bg-slate-50' : 'bg-slate-100'">
                             <div class="flex justify-between">
                                 <div><b x-text="h.label"></b></div>
                                 <div class="text-xs text-slate-400" x-text="new Date(h.ts).toLocaleString()"></div>
@@ -80,7 +80,7 @@
             <div>
                 <h4 class="text-xs text-slate-400">Capacity changes</h4>
                 <ul class="mt-2 text-sm space-y-2">
-                    <template x-for="h in (activePkg?.history || []).filter(x => x.type===''Capacity'')" :key="h.ts+''c''">
+                    <template x-for="h in (activePkg?.history || []).filter(x => x.type==='Capacity')" :key="h.ts+'c'">
                         <li class="p-2 rounded-lg bg-slate-50">
                             <div class="flex justify-between">
                                 <div x-text="h.label"></div>
@@ -102,6 +102,7 @@
     </section>
 </div>
 
+@using System.Text.Json
 @section Scripts {
 <script>
     function packagesApp() {
@@ -110,60 +111,114 @@
             activePkg: null,
             connection: null,
 
-            init() {
-                this.seed();
+            init(initialEvents) {
+                if (initialEvents && Array.isArray(initialEvents)) {
+                    this.processEvents(initialEvents);
+                }
                 setTimeout(() => this.renderSparklines(), 300);
                 this.setupSignalR();
             },
 
+            processEvents(events) {
+                const pkgMap = {};
+                
+                // Sort events chronologically to build state
+                const sorted = [...events].sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+                sorted.forEach(ev => {
+                    if (!ev.after || !ev.after.id) return;
+                    const id = ev.after.id;
+                    
+                    if (!pkgMap[id]) {
+                        pkgMap[id] = {
+                            id: id,
+                            name: ev.after.name || 'Unknown',
+                            price: ev.after.price || 0,
+                            capacity: ev.after.capacity || 0,
+                            used: ev.after.capacityUsed || 0,
+                            isRecentlyChanged: false,
+                            priceHistory: [],
+                            history: [],
+                            summary: ''
+                        };
+                    }
+                    const p = pkgMap[id];
+                    // Update state
+                    if (ev.after.name) p.name = ev.after.name;
+                    if (ev.after.price !== undefined) {
+                        p.price = ev.after.price;
+                        p.priceHistory.push(p.price);
+                    }
+                    if (ev.after.capacity !== undefined) p.capacity = ev.after.capacity;
+                    if (ev.after.capacityUsed !== undefined) p.used = ev.after.capacityUsed;
+
+                    // Add to history log
+                    p.history.unshift({
+                        type: ev.type === 'Create' ? 'Created' : (ev.changes && ev.changes.Price ? 'Price' : 'Capacity'),
+                        ts: new Date(ev.timestamp).getTime(),
+                        label: ev.type,
+                        details: '', // details could be derived from changes
+                        delta: ''
+                    });
+                });
+
+                // Post-process for UI fields
+                this.packages = Object.values(pkgMap).map(p => {
+                    // Keep last 10 price points for sparkline
+                    if (p.priceHistory.length > 10) p.priceHistory = p.priceHistory.slice(-10);
+                    
+                    // Mock summary or derive it
+                    p.summary = `Last update: ${new Date().toLocaleDateString()}`;
+                    p.priceChangeLabel = 'Stable';
+                    if (p.priceHistory.length >= 2) {
+                        const diff = p.price - p.priceHistory[p.priceHistory.length - 2];
+                        if (diff !== 0) p.priceChangeLabel = (diff > 0 ? '+' : '') + '$' + diff;
+                    }
+
+                    return p;
+                });
+            },
+
             setupSignalR() {
                 this.connection = new signalR.HubConnectionBuilder()
-                    .withUrl(''/cdcHub'')
+                    .withUrl('/cdcHub')
                     .withAutomaticReconnect()
                     .build();
 
-                this.connection.on(''PackageEvent'', (evt) => {
-                    const pkg = this.packages.find(p => p.id === evt.id);
-                    if (pkg && evt.after) {
+                this.connection.on('PackageEvent', (evt) => {
+                    // Refresh or incremental update.
+                    // For grid, we just update the specific package or add it.
+                    let pkg = this.packages.find(p => p.id === evt.id);
+                    if (!pkg) {
+                         // New package logic could go here, or just reload/reprocess
+                         // Simpler to just process the single event as incremental update
+                         pkg = { id: evt.id, name: evt.after?.name??'New', priceHistory: [], history: [] };
+                         this.packages.push(pkg);
+                    }
+                    
+                    if (evt.after) {
                         pkg.price = evt.after.price || pkg.price;
                         pkg.capacity = evt.after.capacity || pkg.capacity;
                         pkg.used = evt.after.capacityUsed || pkg.used;
                         pkg.isRecentlyChanged = true;
+                        
+                        // Update lists
+                        if (evt.after.price) pkg.priceHistory.push(evt.after.price);
+                        
+                        pkg.history.unshift({
+                            type: evt.type,
+                            ts: new Date(evt.timestamp).getTime(),
+                            label: evt.type,
+                            details: 'Real-time update'
+                        });
+
                         setTimeout(() => pkg.isRecentlyChanged = false, 5000);
+                        // Re-render sparkline for this package
+                        setTimeout(() => this.renderSparklines(), 100); 
                     }
                 });
 
                 this.connection.start().catch(err => console.error(err));
-            },
-
-            seed() {
-                this.packages = [
-                    {
-                        id: 12, name: ''Family Pack'', price: 120, capacity: 10, used: 7, isRecentlyChanged: true, priceHistory: [115, 118, 120],
-                        priceChangeLabel: ''+$5 this week'',
-                        history: [
-                            { type: ''Price'', ts: Date.now() - 1000 * 60 * 60 * 24 * 3, label: ''Price  118'', details: ''Previous 115  118'' },
-                            { type: ''Price'', ts: Date.now() - 1000 * 60 * 60 * 24 * 1, label: ''Price  120'', details: ''Updated from 118 to 120'' },
-                            { type: ''Capacity'', ts: Date.now() - 1000 * 60 * 60 * 24 * 5, label: ''Capacity '', delta: ''+2'' }
-                        ],
-                        summary: ''In last 7 days 8 bookings affected capacity (7/10 used).''
-                    },
-                    {
-                        id: 15, name: ''Solo Package'', price: 45, capacity: 50, used: 20, isRecentlyChanged: false, priceHistory: [40, 42, 45],
-                        priceChangeLabel: ''+$5 this month'',
-                        history: [
-                            { type: ''Price'', ts: Date.now() - 1000 * 60 * 60 * 24 * 10, label: ''Price  42'', details: ''Promotional change'' },
-                            { type: ''Price'', ts: Date.now() - 1000 * 60 * 60 * 24 * 2, label: ''Price  45'', details: ''Regularized price'' }
-                        ], summary: ''Steady bookings, capacity at 40%.''
-                    },
-                    {
-                        id: 21, name: ''Couple Pack'', price: 80, capacity: 20, used: 12, isRecentlyChanged: false, priceHistory: [75, 80, 80],
-                        priceChangeLabel: ''+$5 last month'',
-                        history: [
-                            { type: ''Price'', ts: Date.now() - 1000 * 60 * 60 * 24 * 7, label: ''Price  80'', details: ''Seasonal increase'' }
-                        ], summary: ''Capacity moving towards limit.''
-                    }
-                ];
             },
 
             viewHistory(pkg) {
@@ -172,13 +227,15 @@
 
             renderSparklines() {
                 this.packages.forEach(p => {
-                    const canvas = document.getElementById(''spark-'' + p.id);
+                    const canvas = document.getElementById('spark-' + p.id);
                     if (canvas) {
-                        const ctx = canvas.getContext(''2d'');
+                        // Destroy old chart if exists (Chart.js quirk, or just let it overlap/fail)
+                        // Simple approach: look for existing instance attached to node or assumes simple content.
+                        const ctx = canvas.getContext('2d');
                         new Chart(ctx, {
-                            type: ''line'', data: {
+                            type: 'line', data: {
                                 labels: p.priceHistory.map((_, i) => i),
-                                datasets: [{ data: p.priceHistory, fill: false, borderColor: ''#F97316'', tension: 0.4, pointRadius: 0 }]
+                                datasets: [{ data: p.priceHistory, fill: false, borderColor: '#F97316', tension: 0.4, pointRadius: 0 }]
                             }, options: { plugins: { legend: { display: false } }, scales: { x: { display: false }, y: { display: false } }, maintainAspectRatio: false, responsive: false }
                         });
                     }

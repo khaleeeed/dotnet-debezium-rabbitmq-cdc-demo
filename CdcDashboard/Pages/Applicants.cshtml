@@ -5,7 +5,7 @@
 	ViewData["Subtitle"] = "Real-time  CDC feed";
 }
 
-<div x-data="applicantsApp()">
+<div x-data="applicantsApp()" x-init="init(@Json.Serialize(Model.InitialEvents))">
 	<!-- top summary + analytics row -->
 	<section class="mb-6 grid grid-cols-12 gap-6">
 		<!-- Summary Cards -->
@@ -155,6 +155,7 @@
 	</section>
 </div>
 
+@using System.Text.Json
 @section Scripts {
 	<script>
 		function applicantsApp() {
@@ -184,50 +185,26 @@
 						? Object.keys(this.selected.changes) : [];
 				},
 
-				init() {
-					this.seed();
+				init(initialEvents) {
+                    if (initialEvents && Array.isArray(initialEvents)) {
+                        initialEvents.forEach(ev => {
+                            this.events.push({
+                                uid: ev.uid,
+                                id: ev.id,
+                                type: ev.type,
+                                before: ev.before || {},
+                                after: ev.after || {},
+                                name: ev.name,
+                                ts: new Date(ev.timestamp).getTime(),
+                                time: new Date(ev.timestamp).toLocaleString(),
+                                changes: ev.changes || {}, // Server typically provides changes dictionary
+                                isNew: false
+                            });
+                        });
+                        this.computeTopFields();
+                        this.updateCounts();
+                    }
 					this.setupSignalR();
-				},
-
-				seed() {
-					const now = Date.now();
-					const seedData = [
-							{ id: 1, type: 'Create', before: null, after: { FirstName: 'John', LastName: 'Doe', Email: 'john@example.com' }, ts: now - 3600000, name: 'John Doe' },
-							{ id: 2, type: 'Create', before: null, after: { FirstName: 'Sara', LastName: 'Ahmed', Email: 'sara@gmail.com' }, ts: now - 2700000, name: 'Sara Ahmed' },
-							{ id: 3, type: 'Update', before: { FirstName: 'Sara', LastName: 'Ahmed', Email: 'sara@gmail.com' }, after: { FirstName: 'Sarah', LastName: 'Ahmed', Email: 'sarah@gmail.com' }, ts: now - 1800000, name: 'Sarah Ahmed' },
-							{ id: 4, type: 'Create', before: null, after: { FirstName: 'Omar', LastName: 'Hassan', Email: 'omar@company.com' }, ts: now - 900000, name: 'Omar Hassan' },
-							{ id: 5, type: 'Create', before: null, after: { FirstName: 'Ali', LastName: 'Khan', Email: 'ali@test.com' }, ts: now - 300000, name: 'Ali Khan' },
-							{ id: 6, type: 'Update', before: { FirstName: 'John', LastName: 'Doe', Email: 'john@example.com' }, after: { FirstName: 'Jonathan', LastName: 'Doe', Email: 'jon@example.com' }, ts: now - 100000, name: 'Jonathan Doe' }
-						];
-					seedData.sort((a, b) => b.ts - a.ts);
-					seedData.forEach((ev, i) => {
-						this.events.push({
-							uid: 'seed-' + i + '-' + ev.id,
-							id: ev.id,
-							type: ev.type,
-							before: ev.before || {},
-							after: ev.after || {},
-							name: ev.name,
-							ts: ev.ts,
-							time: new Date(ev.ts).toLocaleString(),
-							changes: this.getChanges(ev.before, ev.after),
-							isNew: false
-						});
-					});
-					this.computeTopFields();
-					this.updateCounts();
-				},
-
-				getChanges(before, after) {
-					const changes = {};
-					if (!before || !after) return changes;
-					const keys = new Set([...Object.keys(before), ...Object.keys(after)]);
-					keys.forEach(k => {
-						if (String(before[k]) !== String(after[k])) {
-							changes[k] = [before[k], after[k]];
-						}
-					});
-					return changes;
 				},
 
 				setupSignalR() {
@@ -287,6 +264,8 @@
 					const map = {};
 					this.events.forEach(e => {
 						if (e.changes) {
+							// Changes from server might be Dictionary<string, (object, object)>
+                             // Or simpler if serialized differently. Assuming standard JSON dictionary.
 							Object.keys(e.changes).forEach(k => map[k] = (map[k] || 0) + 1);
 						}
 					});
@@ -297,7 +276,11 @@
 
 				formatValue(v) {
 					if (v === null || v === undefined) return '';
-					if (typeof v === 'object') return JSON.stringify(v);
+					if (typeof v === 'object') {
+                        // Handle server tuple (Old, New) if that's how it comes, 
+                        // BUT here we are formatting a single value (Before or After proeprty)
+                        return JSON.stringify(v);
+                    }
 					return String(v);
 				},
 
@@ -313,12 +296,21 @@
 
 				getChangeOld(k) {
 					if (!this.selected || !this.selected.changes || !this.selected.changes[k]) return '';
-					return this.formatValue(this.selected.changes[k][0]);
+                    // Server Dictionary<string, (object, object)> logic:
+                    // changes[k] might be an object { item1: old, item2: new } if serialized from tuple
+                    // OR array [old, new]. Let's handle generic object access.
+                    const val = this.selected.changes[k];
+                    if (Array.isArray(val)) return this.formatValue(val[0]);
+                    if (val && typeof val === 'object' && val.hasOwnProperty('item1')) return this.formatValue(val.item1); 
+					return '?';
 				},
 
 				getChangeNew(k) {
 					if (!this.selected || !this.selected.changes || !this.selected.changes[k]) return '';
-					return this.formatValue(this.selected.changes[k][1]);
+                    const val = this.selected.changes[k];
+                    if (Array.isArray(val)) return this.formatValue(val[1]);
+                    if (val && typeof val === 'object' && val.hasOwnProperty('item2')) return this.formatValue(val.item2);
+					return '?';
 				}
 			};
 		}

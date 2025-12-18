@@ -5,7 +5,7 @@
     ViewData["Subtitle"] = "Status flows  realtime";
 }
 
-<div x-data="bookingsApp()">
+<div x-data="bookingsApp()" x-init="init(@Json.Serialize(Model.InitialEvents), @Json.Serialize(Model.ApplicantNames), @Json.Serialize(Model.PackageNames))">
     <!-- KPIs -->
     <section class="grid grid-cols-4 gap-6 mb-6">
         <div class="bg-white rounded-2xl p-4 shadow">
@@ -142,6 +142,7 @@
     </section>
 </div>
 
+@using System.Text.Json
 @section Scripts {
 <script>
     function bookingsApp() {
@@ -152,11 +153,32 @@
             chart: null,
             connection: null,
             statusFlow: { pending: 0, confirmed: 0, cancelled: 0 },
+            applicantNames: {},
+            packageNames: {},
 
-            init() {
-                this.seed();
-                this.updateKpi();
-                this.renderChart();
+            init(initialEvents, applicantNames, packageNames) {
+                this.applicantNames = applicantNames || {};
+                this.packageNames = packageNames || {};
+                
+                if (initialEvents && Array.isArray(initialEvents)) {
+                    initialEvents.forEach(evt => {
+                         const b = this.makeBookingEvent(
+                            evt.id,
+                            evt.type || 'Create', // Fallback type
+                            evt.after?.statusName || 'Pending',
+                            evt.after?.amount || 0,
+                            evt.changes || {},
+                            evt.after?.bookingDate,
+                            evt.after?.applicantId,
+                            evt.after?.packageId,
+                            new Date(evt.timestamp).getTime()
+                        );
+                        this.events.unshift(b);
+                    });
+                    this.updateKpi();
+                    this.renderChart();
+                }
+
                 this.setupSignalR();
             },
 
@@ -172,7 +194,11 @@
                         evt.type,
                         evt.after?.statusName || 'Pending',
                         evt.after?.amount || 0,
-                        evt.changes || {}
+                        evt.changes || {},
+                        evt.after?.bookingDate,
+                        evt.after?.applicantId,
+                        evt.after?.packageId,
+                        new Date(evt.timestamp).getTime()
                     );
                     this.events.unshift(b);
                     if (this.events.length > 50) this.events.pop();
@@ -183,58 +209,28 @@
                 this.connection.start().catch(err => console.error('SignalR error:', err));
             },
 
-            seed() {
-                const now = Date.now();
-                const seedData = [
-                    { id: 9821, action: 'Update', status: 'Confirmed', amount: 150, changes: { BookingStatus: ['Pending', 'Confirmed'] }, ts: now - 3600000, applicant: 'John Doe', package: 'Family Pack' },
-                    { id: 9814, action: 'Create', status: 'Pending', amount: 50, changes: {}, ts: now - 2700000, applicant: 'Sara Ahmed', package: 'Solo Pack' },
-                    { id: 9802, action: 'Update', status: 'Cancelled', amount: 80, changes: { BookingStatus: ['Confirmed', 'Cancelled'] }, ts: now - 1800000, applicant: 'Omar Hassan', package: 'Couple Pack' },
-                    { id: 9798, action: 'Create', status: 'Pending', amount: 120, changes: {}, ts: now - 900000, applicant: 'Ali Khan', package: 'Family Pack' },
-                    { id: 9795, action: 'Update', status: 'Confirmed', amount: 80, changes: { BookingStatus: ['Pending', 'Confirmed'] }, ts: now - 300000, applicant: 'Fatima Noor', package: 'Couple Pack' },
-                    { id: 9790, action: 'Create', status: 'Pending', amount: 45, changes: {}, ts: now - 100000, applicant: 'Ahmed Raza', package: 'Solo Pack' },
-                    { id: 9785, action: 'Update', status: 'Confirmed', amount: 200, changes: { BookingStatus: ['Pending', 'Confirmed'] }, ts: now - 86400000, applicant: 'Layla Hassan', package: 'Family Pack' },
-                    { id: 9780, action: 'Create', status: 'Confirmed', amount: 95, changes: {}, ts: now - 172800000, applicant: 'Yusuf Ali', package: 'Couple Pack' },
-                    { id: 9775, action: 'Update', status: 'Cancelled', amount: 60, changes: { BookingStatus: ['Pending', 'Cancelled'] }, ts: now - 259200000, applicant: 'Nadia Khan', package: 'Solo Pack' },
-                    { id: 9770, action: 'Create', status: 'Confirmed', amount: 180, changes: {}, ts: now - 345600000, applicant: 'Tariq Mahmoud', package: 'Family Pack' }
-                ];
-                seedData.sort((a, b) => b.ts - a.ts);
-                seedData.forEach((ev, i) => {
-                    const history = ev.action === 'Create' 
-                        ? [{ status: ev.status, time: new Date(ev.ts).toLocaleString() }]
-                        : [
-                            { status: 'Pending', time: new Date(ev.ts - 1000 * 60 * 60 * 24).toLocaleString() },
-                            { status: ev.status, time: new Date(ev.ts).toLocaleString() }
-                        ];
-                    this.events.push({
-                        uid: 'seed-' + i + '-' + ev.id,
-                        id: ev.id,
-                        action: ev.action,
-                        status: ev.status,
-                        amount: ev.amount,
-                        time: new Date(ev.ts).toLocaleString(),
-                        ts: ev.ts,
-                        changes: ev.changes || {},
-                        applicant: ev.applicant,
-                        package: { name: ev.package, price: ev.amount },
-                        history: history
-                    });
-                });
-            },
-
-            makeBookingEvent(id, action, status, amount, changes) {
-                const ts = Date.now();
+            makeBookingEvent(id, action, status, amount, changes, bookingDate, applicantId, packageId, ts) {
+                ts = ts || Date.now();
                 const history = action === 'Create'
                     ? [{ status: status, time: new Date(ts).toLocaleString() }]
                     : [
-                        { status: 'Pending', time: new Date(ts - 1000 * 60 * 60 * 24).toLocaleString() },
+                        { status: 'Pending', time: new Date(ts - 1000 * 60 * 60 * 24).toLocaleString() }, // Mock history inference
                         { status: status, time: new Date(ts).toLocaleString() }
                     ];
+                
+                const applicantName = (applicantId && this.applicantNames[applicantId]) 
+                                      ? this.applicantNames[applicantId] 
+                                      : ('Applicant #' + (applicantId || '?'));
+                const packageName = (packageId && this.packageNames[packageId]) 
+                                    ? this.packageNames[packageId] 
+                                    : ('Package #' + (packageId || '?'));
+
                 return {
                     uid: 'be-' + id + '-' + Math.random().toString(36).slice(2, 6),
                     id, action, status, amount, time: new Date(ts).toLocaleString(), ts,
                     changes: changes || {},
-                    applicant: 'Applicant ' + (Math.floor(Math.random() * 50) + 1),
-                    package: { name: ['Family Pack', 'Solo Pack', 'Couple Pack'][Math.floor(Math.random() * 3)], price: amount },
+                    applicant: applicantName,
+                    package: { name: packageName, price: amount },
                     history: history
                 };
             },

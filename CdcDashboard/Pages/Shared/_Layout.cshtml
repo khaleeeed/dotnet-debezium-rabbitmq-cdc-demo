@@ -30,7 +30,6 @@
                 <a asp-page="/Applicants" class="@(ViewContext.RouteData.Values["page"]?.ToString() == "/Applicants" ? "text-indigo-600 font-medium" : "hover:text-indigo-600")">Applicants</a>
                 <a asp-page="/Bookings" class="ml-4 @(ViewContext.RouteData.Values["page"]?.ToString() == "/Bookings" ? "text-indigo-600 font-medium" : "hover:text-indigo-600")">Bookings</a>
                 <a asp-page="/Packages" class="ml-4 @(ViewContext.RouteData.Values["page"]?.ToString() == "/Packages" ? "text-indigo-600 font-medium" : "hover:text-indigo-600")">Packages</a>
-                <a asp-page="/Shared" class="ml-4 @(ViewContext.RouteData.Values["page"]?.ToString() == "/Shared" ? "text-indigo-600 font-medium" : "hover:text-indigo-600")">Shared</a>
             </nav>
         </div>
         <div class="text-sm text-slate-500">@ViewData["Subtitle"]</div>
