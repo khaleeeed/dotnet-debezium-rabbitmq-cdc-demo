@@ -5,7 +5,7 @@
     ViewData["Subtitle"] = "Status flows  realtime";
 }
 
-<div x-data="bookingsApp()" x-init="init(window.initialBookingEvents, window.initialApplicantNames, window.initialPackageNames)">
+<div x-data="bookingsApp()">
     <!-- KPIs -->
     <section class="grid grid-cols-4 gap-6 mb-6">
         <div class="bg-white rounded-2xl p-4 shadow">
@@ -144,32 +144,62 @@
 
 @using System.Text.Json
 @section Scripts {
-<script>
-    window.initialBookingEvents = @Json.Serialize(Model.InitialEvents);
-    window.initialApplicantNames = @Json.Serialize(Model.ApplicantNames);
-    window.initialPackageNames = @Json.Serialize(Model.PackageNames);
-</script>
-<script>
-    function bookingsApp() {
-        return {
-            events: [],
-            selected: null,
-            kpi: { today: 0, revenue: '$0', pending: 0, confirmed: 0 },
-            chart: null,
-            connection: null,
-            statusFlow: { pending: 0, confirmed: 0, cancelled: 0 },
-            applicantNames: {},
-            packageNames: {},
+    <script>
+        window.initialBookingEvents = @Json.Serialize(Model.InitialEvents);
+        window.initialApplicantNames = @Json.Serialize(Model.ApplicantNames);
+        window.initialPackageNames = @Json.Serialize(Model.PackageNames);
+    </script>
+    <script>
+        function bookingsApp() {
+            return {
+                events: [],
+                selected: null,
+                kpi: { today: 0, revenue: '$0', pending: 0, confirmed: 0 },
+                chart: null,
+                connection: null,
+                statusFlow: { pending: 0, confirmed: 0, cancelled: 0 },
+                applicantNames: {},
+                packageNames: {},
 
-            init(initialEvents, applicantNames, packageNames) {
-                this.applicantNames = applicantNames || {};
-                this.packageNames = packageNames || {};
-                
-                if (initialEvents && Array.isArray(initialEvents)) {
-                    initialEvents.forEach(evt => {
-                         const b = this.makeBookingEvent(
+                init() {
+                    const initialEvents=   window.initialBookingEvents;
+                    const applicantNames=window.initialApplicantNames;
+                    const packageNames=window.initialPackageNames;
+                    this.applicantNames = applicantNames || {};
+                    this.packageNames = packageNames || {};
+
+                    if (initialEvents && Array.isArray(initialEvents)) {
+                        initialEvents.forEach(evt => {
+                             const b = this.makeBookingEvent(
+                                evt.id,
+                                evt.type || 'Create', // Fallback type
+                                evt.after?.statusName || 'Pending',
+                                evt.after?.amount || 0,
+                                evt.changes || {},
+                                evt.after?.bookingDate,
+                                evt.after?.applicantId,
+                                evt.after?.packageId,
+                                new Date(evt.timestamp).getTime()
+                            );
+                            this.events.unshift(b);
+                        });
+                        this.updateKpi();
+                        this.renderChart();
+                    }
+
+                    this.setupSignalR();
+                },
+
+                setupSignalR() {
+                    this.connection = new signalR.HubConnectionBuilder()
+                        .withUrl('/cdcHub')
+                        .withAutomaticReconnect()
+                        .build();
+
+                    this.connection.on('BookingEvent', (evt) => {
+                        const b = this.makeBookingEvent(
                             evt.id,
-                            evt.type || 'Create', // Fallback type
+                            evt.type,
                             evt.after?.statusName || 'Pending',
                             evt.after?.amount || 0,
                             evt.changes || {},
@@ -179,170 +209,143 @@
                             new Date(evt.timestamp).getTime()
                         );
                         this.events.unshift(b);
+                        if (this.events.length > 50) this.events.pop();
+                        this.updateKpi();
+                        this.updateChartData();
                     });
-                    this.updateKpi();
-                    this.renderChart();
-                }
 
-                this.setupSignalR();
-            },
+                    this.connection.start().catch(err => console.error('SignalR error:', err));
+                },
 
-            setupSignalR() {
-                this.connection = new signalR.HubConnectionBuilder()
-                    .withUrl('/cdcHub')
-                    .withAutomaticReconnect()
-                    .build();
+                makeBookingEvent(id, action, status, amount, changes, bookingDate, applicantId, packageId, ts) {
+                    ts = ts || Date.now();
+                    const history = action === 'Create'
+                        ? [{ status: status, time: new Date(ts).toLocaleString() }]
+                        : [
+                            { status: 'Pending', time: new Date(ts - 1000 * 60 * 60 * 24).toLocaleString() }, // Mock history inference
+                            { status: status, time: new Date(ts).toLocaleString() }
+                        ];
 
-                this.connection.on('BookingEvent', (evt) => {
-                    const b = this.makeBookingEvent(
-                        evt.id,
-                        evt.type,
-                        evt.after?.statusName || 'Pending',
-                        evt.after?.amount || 0,
-                        evt.changes || {},
-                        evt.after?.bookingDate,
-                        evt.after?.applicantId,
-                        evt.after?.packageId,
-                        new Date(evt.timestamp).getTime()
-                    );
-                    this.events.unshift(b);
-                    if (this.events.length > 50) this.events.pop();
-                    this.updateKpi();
-                    this.updateChartData();
-                });
+                    const applicantName = (applicantId && this.applicantNames[applicantId])
+                                          ? this.applicantNames[applicantId]
+                                          : ('Applicant #' + (applicantId || '?'));
+                    const packageName = (packageId && this.packageNames[packageId])
+                                        ? this.packageNames[packageId]
+                                        : ('Package #' + (packageId || '?'));
 
-                this.connection.start().catch(err => console.error('SignalR error:', err));
-            },
+                    return {
+                        uid: 'be-' + id + '-' + Math.random().toString(36).slice(2, 6),
+                        id, action, status, amount, time: new Date(ts).toLocaleString(), ts,
+                        changes: changes || {},
+                        applicant: applicantName,
+                        package: { name: packageName, price: amount },
+                        history: history
+                    };
+                },
 
-            makeBookingEvent(id, action, status, amount, changes, bookingDate, applicantId, packageId, ts) {
-                ts = ts || Date.now();
-                const history = action === 'Create'
-                    ? [{ status: status, time: new Date(ts).toLocaleString() }]
-                    : [
-                        { status: 'Pending', time: new Date(ts - 1000 * 60 * 60 * 24).toLocaleString() }, // Mock history inference
-                        { status: status, time: new Date(ts).toLocaleString() }
-                    ];
-                
-                const applicantName = (applicantId && this.applicantNames[applicantId]) 
-                                      ? this.applicantNames[applicantId] 
-                                      : ('Applicant #' + (applicantId || '?'));
-                const packageName = (packageId && this.packageNames[packageId]) 
-                                    ? this.packageNames[packageId] 
-                                    : ('Package #' + (packageId || '?'));
+                updateKpi() {
+                    const todayStart = new Date();
+                    todayStart.setHours(0, 0, 0, 0);
+                    const todayEvents = this.events.filter(e => e.ts >= todayStart.getTime());
 
-                return {
-                    uid: 'be-' + id + '-' + Math.random().toString(36).slice(2, 6),
-                    id, action, status, amount, time: new Date(ts).toLocaleString(), ts,
-                    changes: changes || {},
-                    applicant: applicantName,
-                    package: { name: packageName, price: amount },
-                    history: history
-                };
-            },
+                    this.kpi.today = todayEvents.length;
+                    this.kpi.pending = this.events.filter(e => e.status === 'Pending').length;
+                    this.kpi.confirmed = this.events.filter(e => e.status === 'Confirmed').length;
 
-            updateKpi() {
-                const todayStart = new Date();
-                todayStart.setHours(0, 0, 0, 0);
-                const todayEvents = this.events.filter(e => e.ts >= todayStart.getTime());
+                    const todayRevenue = todayEvents
+                        .filter(e => e.status === 'Confirmed')
+                        .reduce((sum, e) => sum + (e.amount || 0), 0);
+                    this.kpi.revenue = '$' + todayRevenue.toLocaleString();
 
-                this.kpi.today = todayEvents.length;
-                this.kpi.pending = this.events.filter(e => e.status === 'Pending').length;
-                this.kpi.confirmed = this.events.filter(e => e.status === 'Confirmed').length;
+                    // Update status flow for last 24h
+                    const last24h = Date.now() - (24 * 60 * 60 * 1000);
+                    const recentEvents = this.events.filter(e => e.ts >= last24h);
+                    this.statusFlow.pending = recentEvents.filter(e => e.status === 'Pending').length;
+                    this.statusFlow.confirmed = recentEvents.filter(e => e.status === 'Confirmed').length;
+                    this.statusFlow.cancelled = recentEvents.filter(e => e.status === 'Cancelled').length;
+                },
 
-                const todayRevenue = todayEvents
-                    .filter(e => e.status === 'Confirmed')
-                    .reduce((sum, e) => sum + (e.amount || 0), 0);
-                this.kpi.revenue = '$' + todayRevenue.toLocaleString();
+                getFlowPercent(status) {
+                    const total = this.statusFlow.pending + this.statusFlow.confirmed + this.statusFlow.cancelled;
+                    if (total === 0) return '0%';
+                    const value = this.statusFlow[status] || 0;
+                    return Math.round((value / total) * 100) + '%';
+                },
 
-                // Update status flow for last 24h
-                const last24h = Date.now() - (24 * 60 * 60 * 1000);
-                const recentEvents = this.events.filter(e => e.ts >= last24h);
-                this.statusFlow.pending = recentEvents.filter(e => e.status === 'Pending').length;
-                this.statusFlow.confirmed = recentEvents.filter(e => e.status === 'Confirmed').length;
-                this.statusFlow.cancelled = recentEvents.filter(e => e.status === 'Cancelled').length;
-            },
+                timeAgo(ts) {
+                    const d = Math.floor((Date.now() - ts) / 1000);
+                    if (d < 60) return d + 's ago';
+                    if (d < 3600) return Math.floor(d / 60) + 'm ago';
+                    return Math.floor(d / 3600) + 'h ago';
+                },
 
-            getFlowPercent(status) {
-                const total = this.statusFlow.pending + this.statusFlow.confirmed + this.statusFlow.cancelled;
-                if (total === 0) return '0%';
-                const value = this.statusFlow[status] || 0;
-                return Math.round((value / total) * 100) + '%';
-            },
+                renderChart() {
+                    const ctx = document.getElementById('statusChart').getContext('2d');
+                    const days = this.lastNDays(7);
+                    const chartData = this.getChartData(days);
 
-            timeAgo(ts) {
-                const d = Math.floor((Date.now() - ts) / 1000);
-                if (d < 60) return d + 's ago';
-                if (d < 3600) return Math.floor(d / 60) + 'm ago';
-                return Math.floor(d / 3600) + 'h ago';
-            },
-
-            renderChart() {
-                const ctx = document.getElementById('statusChart').getContext('2d');
-                const days = this.lastNDays(7);
-                const chartData = this.getChartData(days);
-
-                this.chart = new Chart(ctx, {
-                    type: 'bar',
-                    data: {
-                        labels: days,
-                        datasets: [
-                            { label: 'Pending', data: chartData.pending, backgroundColor: '#F59E0B' },
-                            { label: 'Confirmed', data: chartData.confirmed, backgroundColor: '#3B82F6' },
-                            { label: 'Cancelled', data: chartData.cancelled, backgroundColor: '#F87171' }
-                        ]
-                    },
-                    options: {
-                        responsive: true,
-                        maintainAspectRatio: false,
-                        scales: {
-                            x: { stacked: true },
-                            y: { stacked: true, beginAtZero: true }
+                    this.chart = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: days,
+                            datasets: [
+                                { label: 'Pending', data: chartData.pending, backgroundColor: '#F59E0B' },
+                                { label: 'Confirmed', data: chartData.confirmed, backgroundColor: '#3B82F6' },
+                                { label: 'Cancelled', data: chartData.cancelled, backgroundColor: '#F87171' }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            scales: {
+                                x: { stacked: true },
+                                y: { stacked: true, beginAtZero: true }
+                            }
                         }
+                    });
+                },
+
+                getChartData(days) {
+                    const data = {
+                        pending: [],
+                        confirmed: [],
+                        cancelled: []
+                    };
+
+                    days.forEach(day => {
+                        const dayStart = new Date(day).getTime();
+                        const dayEnd = dayStart + (24 * 60 * 60 * 1000);
+                        const dayEvents = this.events.filter(e => e.ts >= dayStart && e.ts < dayEnd);
+
+                        data.pending.push(dayEvents.filter(e => e.status === 'Pending').length);
+                        data.confirmed.push(dayEvents.filter(e => e.status === 'Confirmed').length);
+                        data.cancelled.push(dayEvents.filter(e => e.status === 'Cancelled').length);
+                    });
+
+                    return data;
+                },
+
+                updateChartData() {
+                    if (!this.chart) return;
+                    const days = this.lastNDays(7);
+                    const chartData = this.getChartData(days);
+
+                    this.chart.data.datasets[0].data = chartData.pending;
+                    this.chart.data.datasets[1].data = chartData.confirmed;
+                    this.chart.data.datasets[2].data = chartData.cancelled;
+                    this.chart.update();
+                },
+
+                lastNDays(n) {
+                    const r = [];
+                    for (let i = n - 1; i >= 0; i--) {
+                        const d = new Date();
+                        d.setDate(d.getDate() - i);
+                        r.push(d.toISOString().slice(0, 10));
                     }
-                });
-            },
-
-            getChartData(days) {
-                const data = {
-                    pending: [],
-                    confirmed: [],
-                    cancelled: []
-                };
-
-                days.forEach(day => {
-                    const dayStart = new Date(day).getTime();
-                    const dayEnd = dayStart + (24 * 60 * 60 * 1000);
-                    const dayEvents = this.events.filter(e => e.ts >= dayStart && e.ts < dayEnd);
-
-                    data.pending.push(dayEvents.filter(e => e.status === 'Pending').length);
-                    data.confirmed.push(dayEvents.filter(e => e.status === 'Confirmed').length);
-                    data.cancelled.push(dayEvents.filter(e => e.status === 'Cancelled').length);
-                });
-
-                return data;
-            },
-
-            updateChartData() {
-                if (!this.chart) return;
-                const days = this.lastNDays(7);
-                const chartData = this.getChartData(days);
-
-                this.chart.data.datasets[0].data = chartData.pending;
-                this.chart.data.datasets[1].data = chartData.confirmed;
-                this.chart.data.datasets[2].data = chartData.cancelled;
-                this.chart.update();
-            },
-
-            lastNDays(n) {
-                const r = [];
-                for (let i = n - 1; i >= 0; i--) {
-                    const d = new Date();
-                    d.setDate(d.getDate() - i);
-                    r.push(d.toISOString().slice(0, 10));
+                    return r;
                 }
-                return r;
-            }
-        };
-    }
-</script>
+            };
+        }
+    </script>
 }

@@ -7,7 +7,7 @@ public class CdcEvent<T>
     public string Type { get; set; } = string.Empty;
     public T? Before { get; set; }
     public T? After { get; set; }
-    public Dictionary<string, (object? OldValue, object? NewValue)> Changes { get; set; } = new();
+    public Dictionary<string, TrackFieldChange> Changes { get; set; } = new();
     public DateTime Timestamp { get; set; } = DateTime.UtcNow;
     public string Name { get; set; } = string.Empty;
 }

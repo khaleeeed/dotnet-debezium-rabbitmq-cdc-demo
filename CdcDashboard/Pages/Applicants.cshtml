@@ -5,7 +5,7 @@
 	ViewData["Subtitle"] = "Real-time  CDC feed";
 }
 
-<div x-data="applicantsApp()" x-init="init(window.initialApplicantEvents)">
+<div x-data="applicantsApp()">
 	<!-- top summary + analytics row -->
 	<section class="mb-6 grid grid-cols-12 gap-6">
 		<!-- Summary Cards -->
@@ -189,7 +189,8 @@
 						? Object.keys(this.selected.changes) : [];
 				},
 
-				init(initialEvents) {
+				init() {
+					const initialEvents =window.initialApplicantEvents;
                     if (initialEvents && Array.isArray(initialEvents)) {
                         initialEvents.forEach(ev => {
                             this.events.push({
@@ -211,25 +212,25 @@
 					this.setupSignalR();
 				},
 
-				setupSignalR() {
-					this.connection = new signalR.HubConnectionBuilder()
+				setupSignalR() {				
+				this.connection = new signalR.HubConnectionBuilder()
 						.withUrl('/cdcHub')
 						.withAutomaticReconnect()
 						.build();
 
-					this.connection.on('ApplicantEvent', (evt) => {
-						this.unshiftEvent({
-							uid: evt.uid,
-							id: evt.id,
-							type: evt.type,
-							before: evt.before || {},
-							after: evt.after || {},
-							changes: evt.changes || {},
-							ts: new Date(evt.timestamp).getTime(),
-							name: evt.name,
-							time: new Date(evt.timestamp).toLocaleString()
-						});
+				this.connection.on('ApplicantEvent', (evt) => {					
+					this.unshiftEvent({
+						uid: evt.uid,
+						id: evt.id,
+						type: evt.type,
+						before: evt.before || {},
+						after: evt.after || {},
+						changes: evt.changes || {},
+						ts: new Date(evt.timestamp).getTime(),
+						name: evt.name,
+						time: new Date(evt.timestamp).toLocaleString()
 					});
+				});
 
 					this.connection.start().catch(err => console.error('SignalR error:', err));
 				},
@@ -305,7 +306,7 @@
                     // OR array [old, new]. Let's handle generic object access.
                     const val = this.selected.changes[k];
                     if (Array.isArray(val)) return this.formatValue(val[0]);
-                    if (val && typeof val === 'object' && val.hasOwnProperty('item1')) return this.formatValue(val.item1); 
+					if (val && typeof val === 'object' && val.hasOwnProperty('oldValue')) return this.formatValue(val.oldValue);
 					return '?';
 				},
 
@@ -313,7 +314,7 @@
 					if (!this.selected || !this.selected.changes || !this.selected.changes[k]) return '';
                     const val = this.selected.changes[k];
                     if (Array.isArray(val)) return this.formatValue(val[1]);
-                    if (val && typeof val === 'object' && val.hasOwnProperty('item2')) return this.formatValue(val.item2);
+					if (val && typeof val === 'object' && val.hasOwnProperty('newValue')) return this.formatValue(val.newValue);
 					return '?';
 				}
 			};

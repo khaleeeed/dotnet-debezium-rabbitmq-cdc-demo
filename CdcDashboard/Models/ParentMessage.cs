@@ -15,7 +15,7 @@ public class ParentMessage<T>
     public T? Before { get; set; }
     public T? After { get; set; }
     public string? Op { get; set; }
-    
+
     public ChangeOperation Operation => string.IsNullOrEmpty(Op)
         ? ChangeOperation.Unknown
         : Op.ToLowerInvariant() switch
@@ -26,9 +26,9 @@ public class ParentMessage<T>
             _ => ChangeOperation.Unknown
         };
 
-    public Dictionary<string, (object? OldValue, object? NewValue)> GetChangedFields()
+    public Dictionary<string, TrackFieldChange> GetChangedFields()
     {
-        var changes = new Dictionary<string, (object?, object?)>();
+        var changes = new Dictionary<string, TrackFieldChange>();
 
         if (Before == null || After == null)
             return changes;
@@ -42,10 +42,15 @@ public class ParentMessage<T>
 
             if (!Equals(oldValue, newValue))
             {
-                changes[prop.Name] = (oldValue, newValue);
+                changes[prop.Name] = new TrackFieldChange { OldValue = oldValue, NewValue = newValue };
             }
         }
 
         return changes;
     }
+}
+public class TrackFieldChange
+{
+    public object? OldValue { get; set; }
+    public object? NewValue { get; set; }
 }

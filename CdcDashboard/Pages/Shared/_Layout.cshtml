@@ -26,42 +26,33 @@
     <header class="bg-white shadow-sm px-6 py-4 flex items-center justify-between relative z-10">
         <div class="flex items-center gap-4">
             <h1 class="text-lg font-semibold">CDC Dashboard</h1>
-            <nav class="text-sm text-slate-500 flex gap-6">
-                <div class="relative inline-flex">
-                    <a asp-page="/Applicants" @@click="reset('applicants')"
-                       class="inline-flex items-center px-3 py-2 transition-colors rounded-md hover:bg-slate-50"
-                       :class="isActive('/Applicants') ? 'text-indigo-600 font-medium bg-slate-50' : 'hover:text-indigo-600'">
-                       Applicants
-                    </a>
-                    <span x-show="counts.applicants > 0" x-text="counts.applicants" 
-                          x-transition.scale.origin.center
-                          class="absolute top-0 right-0 translate-x-1/2 -translate-y-1/2 flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-rose-500 text-[10px] text-white shadow-sm ring-2 ring-white z-20 pointer-events-none">
-                    </span>
-                </div>
+            <nav class="text-sm text-slate-500 flex gap-4">
+                <a asp-page="/Applicants" @@click="reset('applicants')"
+                   class="inline-flex items-center px-4 py-2 rounded-full transition-colors"
+                   :class="isActive('/Applicants') ? 'text-indigo-600 font-medium bg-indigo-50' : 'hover:text-indigo-600 hover:bg-slate-50'">
+                   Applicants
+                   <span x-show="counts.applicants > 0" x-text="counts.applicants" 
+                         class="ml-2 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white shadow-sm ring-2 ring-white z-50">
+                   </span>
+                </a>
 
-                <div class="relative inline-flex">
-                    <a asp-page="/Bookings" @@click="reset('bookings')"
-                       class="inline-flex items-center px-3 py-2 transition-colors rounded-md hover:bg-slate-50"
-                       :class="isActive('/Bookings') ? 'text-indigo-600 font-medium bg-slate-50' : 'hover:text-indigo-600'">
-                       Bookings
-                    </a>
-                    <span x-show="counts.bookings > 0" x-text="counts.bookings" 
-                          x-transition.scale.origin.center
-                          class="absolute top-0 right-0 translate-x-1/2 -translate-y-1/2 flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-rose-500 text-[10px] text-white shadow-sm ring-2 ring-white z-20 pointer-events-none">
-                    </span>
-                </div>
+                <a asp-page="/Bookings" @@click="reset('bookings')"
+                   class="inline-flex items-center px-4 py-2 rounded-full transition-colors"
+                   :class="isActive('/Bookings') ? 'text-indigo-600 font-medium bg-indigo-50' : 'hover:text-indigo-600 hover:bg-slate-50'">
+                   Bookings
+                   <span x-show="counts.bookings > 0" x-text="counts.bookings" 
+                         class="ml-2 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white shadow-sm ring-2 ring-white z-50">
+                   </span>
+                </a>
 
-                <div class="relative inline-flex">
-                    <a asp-page="/Packages" @@click="reset('packages')"
-                       class="inline-flex items-center px-3 py-2 transition-colors rounded-md hover:bg-slate-50"
-                       :class="isActive('/Packages') ? 'text-indigo-600 font-medium bg-slate-50' : 'hover:text-indigo-600'">
-                       Packages
-                    </a>
-                    <span x-show="counts.packages > 0" x-text="counts.packages" 
-                          x-transition.scale.origin.center
-                          class="absolute top-0 right-0 translate-x-1/2 -translate-y-1/2 flex min-h-[20px] min-w-[20px] items-center justify-center rounded-full bg-rose-500 text-[10px] text-white shadow-sm ring-2 ring-white z-20 pointer-events-none">
-                    </span>
-                </div>
+                <a asp-page="/Packages" @@click="reset('packages')"
+                   class="inline-flex items-center px-4 py-2 rounded-full transition-colors"
+                   :class="isActive('/Packages') ? 'text-indigo-600 font-medium bg-indigo-50' : 'hover:text-indigo-600 hover:bg-slate-50'">
+                   Packages
+                   <span x-show="counts.packages > 0" x-text="counts.packages" 
+                         class="ml-2 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white shadow-sm ring-2 ring-white z-50">
+                   </span>
+                </a>
             </nav>
         </div>
         <div class="text-sm text-slate-500">@ViewData["Subtitle"]</div>

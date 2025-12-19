@@ -114,7 +114,8 @@
             activePkg: null,
             connection: null,
 
-            init(initialEvents) {
+            init() {
+                const initialEvents=window.initialPackageEvents;
                 if (initialEvents && Array.isArray(initialEvents)) {
                     this.processEvents(initialEvents);
                 }
