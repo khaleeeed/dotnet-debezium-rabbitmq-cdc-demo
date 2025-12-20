@@ -364,6 +364,71 @@ The Saga Pattern manages distributed transactions across multiple services. Inst
 -->
 
 ---
+layout: default
+---
+
+# CDC Event Example
+
+**Real-World Debezium Event Payload**
+
+<div class="text-sm mt-4 max-h-96 overflow-y-auto bg-slate-100 p-4 rounded-lg border border-slate-300">
+
+```json
+{
+  "payload": {
+    "before": {
+      "id": 63,
+      "firstName": "Joe",
+      "lastName": "Mo",
+      "email": "Joe.Mo@test.com",
+      "phone": "555-1012",
+      "BirthDate": 7305,
+      "created_at": 1766243020646
+    },
+    "after": {
+      "id": 63,
+      "firstName": "Yousef",
+      "lastName": "Mohammed",
+      "email": "Yousef.Mohammed@hotmail.com",
+      "phone": "555-1002",
+      "BirthDate": 7305,
+      "created_at": 1766243020646
+    },
+    "source": {
+      "version": "3.3.1.Final",
+      "connector": "sqlserver",
+      "name": "sqlserver-cdc",
+      "ts_ms": 1766246891883,
+      "snapshot": "false",
+      "db": "BookingSystem",
+      "schema": "dbo",
+      "table": "applicant",
+      "change_lsn": "00000032:00006160:0002",
+      "commit_lsn": "00000032:00006160:0003",
+      "event_serial_no": 2
+    },
+    "op": "u",
+    "ts_ms": 1766246894032
+  }
+}
+```
+
+</div>
+
+<div class="mt-4 grid grid-cols-2 gap-4 text-sm">
+<div>
+
+
+
+
+</div>
+</div>
+
+<!--
+Here's an actual CDC event from Debezium monitoring a SQL Server database. An applicant updated their contact information. The "before" field shows the original values, and "after" shows the new values. The "op" field indicates this was an update (u = update, c = create, d = delete). The source section provides metadata about where this change came from. This is what gets published to Kafka, allowing downstream services to react to the actual data changes.
+-->
+
+---
 layout: center
 class: text-center
 ---

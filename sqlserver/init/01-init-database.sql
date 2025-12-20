@@ -26,7 +26,7 @@ CREATE TABLE applicant (
     lastName NVARCHAR(100) NOT NULL,
     email NVARCHAR(255) NOT NULL,
     phone NVARCHAR(50),
-    BirthDate DATE,
+    BirthDate DATETIME2,
     CreatedAt DATETIME2 DEFAULT GETDATE()
 );
 GO
@@ -43,6 +43,10 @@ CREATE TABLE booking (
     FOREIGN KEY (applicantId) REFERENCES applicant(id)
 );
 GO
+
+ALTER TABLE Applicant
+ALTER COLUMN BirthDate datetime2(7);
+
 
 -- Enable CDC for required tables
 EXEC sys.sp_cdc_enable_table  

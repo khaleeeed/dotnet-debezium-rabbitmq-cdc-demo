@@ -162,27 +162,32 @@
                 packageNames: {},
 
                 init() {
-                    const initialEvents=   window.initialBookingEvents;
-                    const applicantNames=window.initialApplicantNames;
-                    const packageNames=window.initialPackageNames;
+                    const initialEvents = window.initialBookingEvents;
+                    const applicantNames = window.initialApplicantNames;
+                    const packageNames = window.initialPackageNames;
                     this.applicantNames = applicantNames || {};
                     this.packageNames = packageNames || {};
 
                     if (initialEvents && Array.isArray(initialEvents)) {
-                        initialEvents.forEach(evt => {
-                             const b = this.makeBookingEvent(
-                                evt.id,
-                                evt.type || 'Create', // Fallback type
-                                evt.after?.statusName || 'Pending',
-                                evt.after?.amount || 0,
-                                evt.changes || {},
-                                evt.after?.bookingDate,
-                                evt.after?.applicantId,
-                                evt.after?.packageId,
-                                new Date(evt.timestamp).getTime()
-                            );
-                            this.events.unshift(b);
-                        });
+                        // Sort initial events newest -> oldest so the UI shows newest first
+                        const sorted = [...initialEvents].sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+                        // Map sorted events to booking objects and assign once (keeps order)
+                        this.events = sorted.map(evt => this.makeBookingEvent(
+                            evt.id,
+                            evt.type || 'Create', // Fallback type
+                            evt.after?.statusName || 'Pending',
+                            evt.after?.amount || 0,
+                            evt.changes || {},
+                            evt.after?.bookingDate,
+                            evt.after?.applicantId,
+                            evt.after?.packageId,
+                            new Date(evt.timestamp).getTime()
+                        ));
+
+                        // Optionally cap initial list to most recent 50
+                        if (this.events.length > 50) this.events = this.events.slice(0, 50);
+
                         this.updateKpi();
                         this.renderChart();
                     }

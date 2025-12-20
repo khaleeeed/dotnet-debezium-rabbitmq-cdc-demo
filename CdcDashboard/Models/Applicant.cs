@@ -18,7 +18,7 @@ public class Applicant
         ? DateTimeOffset.FromUnixTimeMilliseconds(BirthDateEpoch.Value).DateTime 
         : null;
 
-    [JsonPropertyName("createdAt")]
+    [JsonPropertyName("created_at")]
     public long CreatedAtEpoch { get; set; }
 
     [JsonIgnore]
